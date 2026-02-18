@@ -25,6 +25,25 @@ func ByName(name string) (bool, int, error) {
 	return false, 0, nil
 }
 
+// PidsByName returns all PIDs that match the given process name.
+func PidsByName(name string) ([]int, error) {
+	processes, err := process.Processes()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]int, 0, 4)
+	for _, p := range processes {
+		n, err := p.Name()
+		if err != nil {
+			continue
+		}
+		if n == name {
+			out = append(out, int(p.Pid))
+		}
+	}
+	return out, nil
+}
+
 // IsPidAlive reports if a PID is running.
 func IsPidAlive(pid int) bool {
 	p, err := process.NewProcess(int32(pid))
@@ -33,6 +52,40 @@ func IsPidAlive(pid int) bool {
 	}
 	running, _ := p.IsRunning()
 	return running
+}
+
+// KillByName attempts to terminate all processes matching the given name.
+func KillByName(name string) error {
+	pids, err := PidsByName(name)
+	if err != nil {
+		return err
+	}
+	var lastErr error
+	for _, pid := range pids {
+		p, err := process.NewProcess(int32(pid))
+		if err != nil {
+			continue
+		}
+		if err := p.Terminate(); err != nil {
+			lastErr = err
+		}
+	}
+	return lastErr
+}
+
+// KillByNames terminates processes for all provided names.
+func KillByNames(names []string) error {
+	var lastErr error
+	for _, n := range names {
+		n = strings.TrimSpace(n)
+		if n == "" {
+			continue
+		}
+		if err := KillByName(n); err != nil {
+			lastErr = err
+		}
+	}
+	return lastErr
 }
 
 // StartTime returns the process start time for a PID.

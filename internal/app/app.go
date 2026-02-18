@@ -28,6 +28,7 @@ type App struct {
 	lastRenderLines int
 	lastRenderWidth int
 	restartAt       map[string]time.Time
+	hungSince       map[string]time.Time
 }
 
 func New(cfg config.Config, logger *log.Logger, version string) *App {
@@ -41,6 +42,7 @@ func New(cfg config.Config, logger *log.Logger, version string) *App {
 		version:    version,
 		startTimes: make(map[int]int64),
 		restartAt:  make(map[string]time.Time),
+		hungSince:  make(map[string]time.Time),
 	}
 }
 
@@ -122,6 +124,23 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 				}
 			}
 			status.Target = buildExeTarget(item, namesToCheck)
+			if alive && item.MonitorHang && item.HangTimeout.Duration > 0 {
+				hung := isAnyProcessHung(namesToCheck)
+				if hung {
+					if _, ok := a.hungSince[name]; !ok {
+						a.hungSince[name] = now
+					}
+					if now.Sub(a.hungSince[name]) >= item.HangTimeout.Duration {
+						_ = process.KillByNames(namesToCheck)
+						alive = false
+						status.Err = "Not responding"
+						a.restartAt[name] = now
+						delete(a.hungSince, name)
+					}
+				} else {
+					delete(a.hungSince, name)
+				}
+			}
 		case config.TypeCmd:
 			if strings.TrimSpace(item.CheckCmdline) != "" {
 				ok, pid, err := process.ByNameAndCmdlineContains(item.CheckProcess, item.CheckCmdline)
@@ -205,6 +224,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			status.Pid = item.Pid
 			a.fillTimes(&status, now)
 			delete(a.restartAt, name)
+			delete(a.hungSince, name)
 			statuses = append(statuses, status)
 			continue
 		}
@@ -402,6 +422,25 @@ func buildExeTarget(item *config.ProcessItem, namesToCheck []string) string {
 		return strings.Join(namesToCheck, ", ")
 	}
 	return item.Process
+}
+
+func isAnyProcessHung(names []string) bool {
+	for _, n := range names {
+		n = strings.TrimSpace(n)
+		if n == "" {
+			continue
+		}
+		pids, err := process.PidsByName(n)
+		if err != nil {
+			continue
+		}
+		for _, pid := range pids {
+			if isProcessHung(pid) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func validatePath(dir, name string) string {
