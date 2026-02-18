@@ -55,6 +55,8 @@ func (a *App) Run(ctx context.Context) error {
 		return fmt.Errorf("invalid restart timing: %v\n\n", a.cfg.Settings.RestartTiming)
 	}
 
+	hideCursor()
+
 	statuses := a.computeStatuses(true, time.Now())
 	a.render(statuses)
 
