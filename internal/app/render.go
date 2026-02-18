@@ -73,7 +73,11 @@ func (a *App) render(statuses []procStatus) {
 			s.Target,
 			truncateDisplay(s.Err, widths[7]),
 		}
-		b.WriteString(formatRow(row, widths))
+		line := formatRow(row, widths)
+		if ansiEnabled && s.Hung {
+			line = "\x1b[41m" + line + "\x1b[0m"
+		}
+		b.WriteString(line)
 		b.WriteString("\n")
 	}
 

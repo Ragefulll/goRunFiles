@@ -126,6 +126,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			status.Target = buildExeTarget(item, namesToCheck)
 			if alive && item.MonitorHang && item.HangTimeout.Duration > 0 {
 				hung := isAnyProcessHung(namesToCheck)
+				status.Hung = hung
 				if hung {
 					if _, ok := a.hungSince[name]; !ok {
 						a.hungSince[name] = now
@@ -274,6 +275,7 @@ type procStatus struct {
 	Pid       int
 	StartedAt string
 	Uptime    string
+	Hung      bool
 	Err       string
 }
 

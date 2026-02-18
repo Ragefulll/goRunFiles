@@ -5,12 +5,19 @@ package app
 import (
 	"strings"
 	"syscall"
+	"sync"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
 
 const wmClose = 0x0010
+
+var (
+	enumMu             sync.Mutex
+	currentTitleNeedles []string
+	enumCloseCallback  = syscall.NewCallback(enumCloseProc)
+)
 
 func closeErrorWindows(titleSubstrings []string) {
 	if len(titleSubstrings) == 0 {
@@ -28,25 +35,11 @@ func closeErrorWindows(titleSubstrings []string) {
 		return
 	}
 
-	cb := syscall.NewCallback(func(hwnd uintptr, lparam uintptr) uintptr {
-		if !windows.IsWindowVisible(windows.HWND(hwnd)) {
-			return 1
-		}
-		title := windowTitle(windows.HWND(hwnd))
-		if title == "" {
-			return 1
-		}
-		lt := strings.ToLower(title)
-		for _, s := range lower {
-			if strings.Contains(lt, s) {
-				sendMessage(windows.HWND(hwnd), wmClose, 0, 0)
-				break
-			}
-		}
-		return 1
-	})
-
-	_, _, _ = procEnumWindows.Call(cb, 0)
+	enumMu.Lock()
+	currentTitleNeedles = lower
+	_, _, _ = procEnumWindows.Call(enumCloseCallback, 0)
+	currentTitleNeedles = nil
+	enumMu.Unlock()
 }
 
 func windowTitle(hwnd windows.HWND) string {
@@ -80,4 +73,22 @@ func getWindowText(hwnd windows.HWND, buf *uint16, max int32) int32 {
 func sendMessage(hwnd windows.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	r, _, _ := procSendMessageW.Call(uintptr(hwnd), uintptr(msg), wParam, lParam)
 	return r
+}
+
+func enumCloseProc(hwnd uintptr, lparam uintptr) uintptr {
+	if !windows.IsWindowVisible(windows.HWND(hwnd)) {
+		return 1
+	}
+	title := windowTitle(windows.HWND(hwnd))
+	if title == "" {
+		return 1
+	}
+	lt := strings.ToLower(title)
+	for _, s := range currentTitleNeedles {
+		if strings.Contains(lt, s) {
+			sendMessage(windows.HWND(hwnd), wmClose, 0, 0)
+			break
+		}
+	}
+	return 1
 }
