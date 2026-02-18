@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -46,20 +48,20 @@ func (a *App) Run(ctx context.Context) error {
 	if ctx == nil {
 		return fmt.Errorf("context is nil")
 	}
-	if a.cfg.Settings.CheckTiming <= 0 {
+	if a.cfg.Settings.CheckTiming.Duration <= 0 {
 		return fmt.Errorf("invalid check timing: %v\n\n", a.cfg.Settings.CheckTiming)
 	}
-	if a.cfg.Settings.RestartTiming <= 0 {
+	if a.cfg.Settings.RestartTiming.Duration <= 0 {
 		return fmt.Errorf("invalid restart timing: %v\n\n", a.cfg.Settings.RestartTiming)
 	}
 
 	statuses := a.computeStatuses(true, time.Now())
 	a.render(statuses)
 
-	checkTicker := time.NewTicker(a.cfg.Settings.CheckTiming * time.Second)
+	checkTicker := time.NewTicker(a.cfg.Settings.CheckTiming.Duration)
 	defer checkTicker.Stop()
 
-	restartTicker := time.NewTicker(a.cfg.Settings.RestartTiming * time.Second)
+	restartTicker := time.NewTicker(a.cfg.Settings.RestartTiming.Duration)
 	defer restartTicker.Stop()
 
 	for {
@@ -100,6 +102,9 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 		var alive bool
 		switch item.Type {
 		case config.TypeExe:
+			if pathErr := validatePath(item.Path, item.Process); pathErr != "" {
+				status.Err = pathErr
+			}
 			namesToCheck := parseProcessList(item.Process, item.CheckProcess)
 			for _, procName := range namesToCheck {
 				ok, pid, err := process.ByName(procName)
@@ -145,6 +150,9 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			}
 			status.Target = item.Command
 		case config.TypeBat:
+			if pathErr := validatePath(item.Path, item.Process); pathErr != "" {
+				status.Err = pathErr
+			}
 			checkCmdline := strings.TrimSpace(item.CheckCmdline)
 			if checkCmdline == "" {
 				checkCmdline = item.Process
@@ -203,7 +211,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 		a.last[name] = "❌"
 
 		if _, ok := a.restartAt[name]; !ok {
-			a.restartAt[name] = now.Add(a.cfg.Settings.RestartTiming * time.Second)
+			a.restartAt[name] = now.Add(a.cfg.Settings.RestartTiming.Duration)
 		}
 
 		if doRestart && !a.restartAt[name].After(now) {
@@ -317,7 +325,7 @@ func (a *App) buildAutoErrorTitles() []string {
 		if name == "" {
 			continue
 		}
-		out = append(out, "The "+name+" Game has crashed and will close")
+		out = append(out, "The UE-"+name+" Game has crashed and will close")
 	}
 	return out
 }
@@ -388,9 +396,22 @@ func buildBatTarget(item *config.ProcessItem) string {
 }
 
 func buildExeTarget(item *config.ProcessItem, namesToCheck []string) string {
-	target := strings.Join(namesToCheck, ", ")
-	if item.Args == "" {
-		return target
+	if strings.TrimSpace(item.Process) == "" {
+		return strings.Join(namesToCheck, ", ")
 	}
-	return target
+	return item.Process
+}
+
+func validatePath(dir, name string) string {
+	if strings.TrimSpace(dir) == "" || strings.TrimSpace(name) == "" {
+		return ""
+	}
+	full := filepath.Join(dir, name)
+	if _, err := os.Stat(full); err != nil {
+		if os.IsNotExist(err) {
+			return "File not found"
+		}
+		return "path error: " + err.Error()
+	}
+	return ""
 }
