@@ -1,0 +1,121 @@
+package main
+
+import (
+	"github.com/shirou/gopsutil/v3/process"
+	"gopkg.in/gcfg.v1"
+	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"time"
+)
+
+const configIni = "config.ini"
+
+type Config struct {
+	Process     []string
+	Path        []string
+	CheckTiming time.Duration
+}
+
+type configFile struct {
+	Process Config
+}
+
+const defaultConfig = `
+    [process]
+    process=cmd.exe
+    path=C:\\WINDOWS\\system32\\cmd.exe
+	checkTiming=60
+`
+
+func LoadConfiguration(cfgFile string) Config {
+	var err error
+	var cfg configFile
+
+	if cfgFile != "" {
+		err = gcfg.ReadFileInto(&cfg, cfgFile)
+	} else {
+		err = gcfg.ReadStringInto(&cfg, defaultConfig)
+	}
+
+	if err != nil {
+		log.Println(err)
+	}
+
+	return cfg.Process
+}
+
+func WorkProcess(name string, kill bool) (error, bool) {
+	processes, err := process.Processes()
+	if err != nil {
+		return err, true
+	}
+	for _, p := range processes {
+		n, err := p.Name()
+		if err != nil {
+			continue
+		}
+
+		if n == name {
+			if kill {
+				return p.Kill(), true
+			}
+			return nil, true
+		}
+	}
+	return nil, false
+}
+
+func (cfg *Config) checkProcess() bool {
+	for {
+		for index, p := range cfg.Process {
+			// Проверка на существование процесса
+			err, processFound := WorkProcess(p, false)
+			if err != nil {
+				log.Println("ERROR!", err, processFound)
+			}
+
+			// Запуск процесса, если он ещё не запущен
+			if !processFound {
+				log.Printf("[ART3D-CHEKER]: Процесс не найден, запуск процесса: %s\r\n", p)
+
+				if index <= len(cfg.Process)-1 {
+					//cmd := exec.Command("start", cfg.Path[index])
+
+					if _, err := os.Stat(cfg.Path[index]); os.IsNotExist(err) {
+						log.Printf("Файл %s не существует!\r\n", cfg.Path[index])
+						continue
+					}
+
+					// ЗАПУСК
+					dir := filepath.Dir(cfg.Path[index])
+					exe := filepath.Base(cfg.Path[index])
+					cmd := exec.Command("cmd.exe", "/C", "start", "", exe)
+					cmd.Dir = dir
+					// КОНЕЦ ЗАПУСКА
+
+					// Логирование для отладки
+					log.Printf("[ART3D-CHEKER]: Запуск exe='%s', dir='%s'", exe, dir)
+
+					if err := cmd.Start(); err != nil {
+						log.Printf("ERROR: %v\r\n\n", err)
+					} else {
+						log.Printf("[ART3D-CHEKER]: Процесс запущен %s\r\n\n", p)
+					}
+				} else {
+					log.Printf("[ART3D-CHEKER]: в %s не найден path\r\n", configIni)
+				}
+			}
+		}
+		<-time.After(cfg.CheckTiming * time.Second)
+	}
+}
+
+func main() {
+	log.Println("\n\n\n\n╱╭━━━╮╱╭━━━╮╱╭━━━━╮╱╭━━━╮╱╭━━━╮\n╱┃╭━╮┃╱┃╭━╮┃╱┃╭╮╭╮┃╱┃╭━╮┃╱╰╮╭╮┃\n╱┃┃╱┃┃╱┃╰━╯┃╱╰╯┃┃╰╯╱╰╯╭╯┃╱╱┃┃┃┃\n╱┃╰━╯┃╱┃╭╮╭╯╱╱╱┃┃╱╱╱╭╮╰╮┃╱╱┃┃┃┃\n╱┃╭━╮┃╱┃┃┃╰╮╱╱╱┃┃╱╱╱┃╰━╯┃╱╭╯╰╯┃\n╱╰╯╱╰╯╱╰╯╰━╯╱╱╱╰╯╱╱╱╰━━━╯╱╰━━━╯\n\n\n")
+	// Загрузка конфига
+	cfg := LoadConfiguration(configIni)
+	go cfg.checkProcess()
+	select {}
+}
