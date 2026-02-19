@@ -38,7 +38,7 @@ func (a *App) render(statuses []procStatus) {
 		cols := []string{
 			s.Name,
 			s.Type,
-			s.Status,
+			s.Status.Icon(),
 			s.pidString(),
 			s.StartedAt,
 			s.Uptime,
@@ -66,16 +66,24 @@ func (a *App) render(statuses []procStatus) {
 		row := []string{
 			s.Name,
 			s.Type,
-			s.Status,
+			s.Status.Icon(),
 			s.pidString(),
 			s.StartedAt,
 			s.Uptime,
 			s.Target,
 			truncateDisplay(s.Err, widths[7]),
 		}
-		line := formatRow(row, widths)
+		line := formatRowWithColors(row, widths, func(col int, text string) string {
+			if !ansiEnabled {
+				return text
+			}
+			if col != 2 {
+				return text
+			}
+			return colorizeStatus(s.Status, text)
+		})
 		if ansiEnabled && s.Hung {
-			line = "\x1b[41m" + line + "\x1b[0m"
+			line = "\x1b[41m" + line + "\x1b[49m"
 		}
 		b.WriteString(line)
 		b.WriteString("\n")
@@ -125,10 +133,38 @@ func formatRow(cols []string, widths []int) string {
 	return out
 }
 
+func formatRowWithColors(cols []string, widths []int, colorFn func(col int, text string) string) string {
+	out := ""
+	for i, c := range cols {
+		if i > 0 {
+			out += "  "
+		}
+		padded := padRight(c, widths[i])
+		if colorFn != nil {
+			padded = colorFn(i, padded)
+		}
+		out += padded
+	}
+	return out
+}
+
 func dividerRow(widths []int) []string {
 	out := make([]string, len(widths))
 	for i, w := range widths {
 		out[i] = strings.Repeat("-", w)
 	}
 	return out
+}
+
+func colorizeStatus(s Status, text string) string {
+	switch s {
+	case StatusRunning:
+		return "\x1b[32m" + text + "\x1b[39m"
+	case StatusStarted:
+		return "\x1b[33m" + text + "\x1b[39m"
+	case StatusStopped, StatusUnknown:
+		return "\x1b[31m" + text + "\x1b[39m"
+	default:
+		return text
+	}
 }

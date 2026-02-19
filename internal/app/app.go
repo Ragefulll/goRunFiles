@@ -22,7 +22,7 @@ const LogTag = "[ART3D-CHEKER]:"
 type App struct {
 	cfg             config.Config
 	logger          *log.Logger
-	last            map[string]string
+	last            map[string]Status
 	version         string
 	startTimes      map[int]int64
 	lastRenderLines int
@@ -38,7 +38,7 @@ func New(cfg config.Config, logger *log.Logger, version string) *App {
 	return &App{
 		cfg:        cfg,
 		logger:     logger,
-		last:       make(map[string]string),
+		last:       make(map[string]Status),
 		version:    version,
 		startTimes: make(map[int]int64),
 		restartAt:  make(map[string]time.Time),
@@ -208,19 +208,19 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			}
 			status.Target = buildBatTarget(item)
 		default:
-			status.Status = "❌"
+			status.Status = StatusStopped
 			status.Err = "unknown type: " + item.Type
 			statuses = append(statuses, status)
 			continue
 		}
 
 		if alive {
-			if a.last[name] == "*" {
-				status.Status = "*"
-				a.last[name] = "✔"
+			if a.last[name] == StatusStarted {
+				status.Status = StatusStarted
+				a.last[name] = StatusRunning
 			} else {
-				status.Status = "✔"
-				a.last[name] = "✔"
+				status.Status = StatusRunning
+				a.last[name] = StatusRunning
 			}
 			status.Pid = item.Pid
 			a.fillTimes(&status, now)
@@ -230,8 +230,8 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			continue
 		}
 
-		status.Status = "❌"
-		a.last[name] = "❌"
+		status.Status = StatusStopped
+		a.last[name] = StatusStopped
 
 		if _, ok := a.restartAt[name]; !ok {
 			a.restartAt[name] = now.Add(a.cfg.Settings.RestartTiming.Duration)
@@ -247,8 +247,8 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			}
 			item.Pid = pid
 			status.Pid = pid
-			status.Status = "*"
-			a.last[name] = "*"
+			status.Status = StatusStarted
+			a.last[name] = StatusStarted
 			if pid > 0 {
 				a.startTimes[pid] = time.Now().UnixMilli()
 				a.fillTimes(&status, now)
@@ -270,7 +270,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 type procStatus struct {
 	Name      string
 	Type      string
-	Status    string
+	Status    Status
 	Target    string
 	Pid       int
 	StartedAt string
