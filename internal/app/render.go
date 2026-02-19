@@ -6,8 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mattn/go-runewidth"
 	"goRunFiles/internal/config"
+
+	"github.com/mattn/go-runewidth"
 )
 
 func (a *App) render(statuses []procStatus) {
@@ -57,6 +58,13 @@ func (a *App) render(statuses []procStatus) {
 		widths[7] = maxErr
 	}
 
+	// PID
+	widths[3] = 6
+	// STARTED
+	widths[4] = 19
+	// UPTIME
+	widths[5] = 16
+
 	b.WriteString(formatRow(headers, widths))
 	b.WriteString("\n")
 	b.WriteString(formatRow(dividerRow(widths), widths))
@@ -67,9 +75,9 @@ func (a *App) render(statuses []procStatus) {
 			s.Name,
 			s.Type,
 			s.Status.Icon(),
-			s.pidString(),
-			s.StartedAt,
-			s.Uptime,
+			truncateDisplay(s.pidString(), widths[3]),
+			truncateDisplay(s.StartedAt, widths[4]),
+			truncateDisplay(s.Uptime, widths[5]),
 			s.Target,
 			truncateDisplay(s.Err, widths[7]),
 		}
