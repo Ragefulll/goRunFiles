@@ -20,6 +20,7 @@ const (
 
 // ProcessItem Один процесс
 type ProcessItem struct {
+	Disabled     bool
 	Process      string
 	CheckProcess string
 	CheckCmdline string

@@ -98,6 +98,9 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 
 	for _, name := range names {
 		item := a.cfg.Process[name]
+		if item.Disabled {
+			continue
+		}
 		status := procStatus{
 			Name: name,
 			Type: item.Type,
