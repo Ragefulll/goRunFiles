@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"goRunFiles/internal/config"
@@ -29,6 +30,7 @@ type App struct {
 	lastRenderWidth int
 	restartAt       map[string]time.Time
 	hungSince       map[string]time.Time
+	mu              sync.Mutex
 }
 
 func New(cfg config.Config, logger *log.Logger, version string) *App {
@@ -81,7 +83,51 @@ func (a *App) Run(ctx context.Context) error {
 	}
 }
 
+// RunWithObserver runs the monitor loop and reports snapshots via callback.
+func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot)) error {
+	if ctx == nil {
+		return fmt.Errorf("context is nil")
+	}
+	if a.cfg.Settings.CheckTiming.Duration <= 0 {
+		return fmt.Errorf("invalid check timing: %v\n\n", a.cfg.Settings.CheckTiming)
+	}
+	if a.cfg.Settings.RestartTiming.Duration <= 0 {
+		return fmt.Errorf("invalid restart timing: %v\n\n", a.cfg.Settings.RestartTiming)
+	}
+	if onUpdate == nil {
+		return fmt.Errorf("onUpdate is nil")
+	}
+
+	now := time.Now()
+	statuses := a.computeStatuses(true, now)
+	onUpdate(buildDisplaySnapshot(a.version, statuses, now))
+
+	checkTicker := time.NewTicker(a.cfg.Settings.CheckTiming.Duration)
+	defer checkTicker.Stop()
+
+	restartTicker := time.NewTicker(a.cfg.Settings.RestartTiming.Duration)
+	defer restartTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-checkTicker.C:
+			now := time.Now()
+			statuses := a.computeStatuses(false, now)
+			onUpdate(buildDisplaySnapshot(a.version, statuses, now))
+		case <-restartTicker.C:
+			now := time.Now()
+			statuses := a.computeStatuses(true, now)
+			onUpdate(buildDisplaySnapshot(a.version, statuses, now))
+		}
+	}
+}
+
 func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	if a.cfg.Settings.AutoCloseErrorDialogs {
 		titles := parseCSV(a.cfg.Settings.ErrorWindowTitles)
 		titles = append(titles, a.buildAutoErrorTitles()...)
@@ -98,12 +144,15 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 
 	for _, name := range names {
 		item := a.cfg.Process[name]
-		if item.Disabled {
-			continue
-		}
 		status := procStatus{
 			Name: name,
 			Type: item.Type,
+		}
+		if item.Disabled {
+			status.Status = StatusDisabled
+			status.Err = ""
+			statuses = append(statuses, status)
+			continue
 		}
 
 		var alive bool
@@ -268,6 +317,69 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 	}
 
 	return statuses
+}
+
+// UpdateConfig replaces the current config with a new one.
+func (a *App) UpdateConfig(cfg config.Config) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.cfg = cfg
+	a.last = make(map[string]Status)
+	a.startTimes = make(map[int]int64)
+	a.restartAt = make(map[string]time.Time)
+	a.hungSince = make(map[string]time.Time)
+}
+
+// StartProcess starts a process by config name.
+func (a *App) StartProcess(name string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	item, ok := a.cfg.Process[name]
+	if !ok {
+		return fmt.Errorf("process %q not found", name)
+	}
+	if item.Disabled {
+		return fmt.Errorf("process %q is disabled", name)
+	}
+	pid, err := runner.Start(item, a.cfg.Settings.LaunchInNewConsole)
+	if err != nil {
+		return err
+	}
+	item.Pid = pid
+	a.last[name] = StatusStarted
+	return nil
+}
+
+// StopProcess stops a process by config name.
+func (a *App) StopProcess(name string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	item, ok := a.cfg.Process[name]
+	if !ok {
+		return fmt.Errorf("process %q not found", name)
+	}
+	return stopProcessItem(item)
+}
+
+// RestartProcess restarts a process by config name.
+func (a *App) RestartProcess(name string) error {
+	if err := a.StopProcess(name); err != nil {
+		return err
+	}
+	return a.StartProcess(name)
+}
+
+// StopAll stops all configured processes (including disabled).
+func (a *App) StopAll() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	var lastErr error
+	for _, item := range a.cfg.Process {
+		if err := stopProcessItem(item); err != nil {
+			lastErr = err
+		}
+	}
+	return lastErr
 }
 
 type procStatus struct {
@@ -460,4 +572,34 @@ func validatePath(dir, name string) string {
 		return "path error: " + err.Error()
 	}
 	return ""
+}
+
+func stopProcessItem(item *config.ProcessItem) error {
+	switch item.Type {
+	case config.TypeExe:
+		names := parseProcessList(item.Process, item.CheckProcess)
+		if err := process.KillByNames(names); err != nil {
+			return err
+		}
+		item.Pid = 0
+		return nil
+	case config.TypeCmd, config.TypeBat:
+		if strings.TrimSpace(item.CheckProcess) != "" {
+			names := parseProcessList("", item.CheckProcess)
+			if err := process.KillByNames(names); err != nil {
+				return err
+			}
+			item.Pid = 0
+			return nil
+		}
+		if item.Pid > 0 {
+			if err := process.KillPid(item.Pid); err != nil {
+				return err
+			}
+			item.Pid = 0
+		}
+		return nil
+	default:
+		return fmt.Errorf("unknown type %q", item.Type)
+	}
 }

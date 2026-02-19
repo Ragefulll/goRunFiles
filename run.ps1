@@ -1,10 +1,18 @@
 param(
   [string]$Config = "",
   [string]$Exe = "",
-  [switch]$NoGenerate
+  [switch]$NoGenerate,
+  [switch]$Gui
 )
 
 $ErrorActionPreference = "Stop"
+
+if ($Gui) {
+  Push-Location .\cmd\goRunFilesWails
+  wails dev
+  Pop-Location
+  exit $LASTEXITCODE
+}
 
 if (-not $NoGenerate) {
   go generate .\cmd\goRunFiles

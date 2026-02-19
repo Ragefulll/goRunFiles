@@ -4,10 +4,11 @@ package app
 type Status string
 
 const (
-	StatusUnknown Status = "unknown"
-	StatusRunning Status = "running"
-	StatusStarted Status = "started"
-	StatusStopped Status = "stopped"
+	StatusUnknown  Status = "unknown"
+	StatusRunning  Status = "running"
+	StatusStarted  Status = "started"
+	StatusStopped  Status = "stopped"
+	StatusDisabled Status = "disabled"
 )
 
 // Icon returns the user-facing marker for a status.
@@ -19,7 +20,9 @@ func (s Status) Icon() string {
 		return "☆︎ RUN     "
 	case StatusStopped:
 		return "✗︎ NRUN    "
+	case StatusDisabled:
+		return "⛔︎ DISABLED"
 	default:
-		return "☠︎ UNKNOWN"
+		return "☠︎ UNKNOWN "
 	}
 }

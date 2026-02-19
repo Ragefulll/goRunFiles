@@ -172,6 +172,8 @@ func colorizeStatus(s Status, text string) string {
 		return "\x1b[33m" + text + "\x1b[39m"
 	case StatusStopped, StatusUnknown:
 		return "\x1b[31m" + text + "\x1b[39m"
+	case StatusDisabled:
+		return "\x1b[90m" + text + "\x1b[39m"
 	default:
 		return text
 	}

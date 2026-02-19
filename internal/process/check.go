@@ -88,6 +88,18 @@ func KillByNames(names []string) error {
 	return lastErr
 }
 
+// KillPid attempts to terminate a process by PID.
+func KillPid(pid int) error {
+	if pid <= 0 {
+		return nil
+	}
+	p, err := process.NewProcess(int32(pid))
+	if err != nil {
+		return err
+	}
+	return p.Terminate()
+}
+
 // StartTime returns the process start time for a PID.
 func StartTime(pid int) (time.Time, bool) {
 	p, err := process.NewProcess(int32(pid))

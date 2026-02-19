@@ -36,6 +36,7 @@ func Start(item *config.ProcessItem, launchInNewConsole bool) (int, error) {
 			cmd = exec.Command("cmd.exe", "/C", "start", "", "cmd.exe", "/C", item.Command)
 		} else {
 			cmd = exec.Command("cmd.exe", "/C", item.Command)
+			hideWindow(cmd)
 		}
 		cmd.Dir = item.Path
 
@@ -61,6 +62,7 @@ func Start(item *config.ProcessItem, launchInNewConsole bool) (int, error) {
 		} else {
 			callArgs := append([]string{"/C", "call", processPath}, args...)
 			cmd = exec.Command("cmd.exe", callArgs...)
+			hideWindow(cmd)
 		}
 		cmd.Dir = filepath.Dir(processPath)
 

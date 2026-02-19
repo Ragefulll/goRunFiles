@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>goRunFiles Monitor</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="head">
+        <div class="title">goRunFiles Monitor</div>
+        <div class="meta">Updated: <span id="updated">—</span></div>
+        <div class="meta">Version: <span id="version">—</span></div>
+      </header>
+
+      <section class="panel">
+        <h2>Processes</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>NAME</th><th>TYPE</th><th>STATUS</th><th>PID</th>
+              <th>STARTED</th><th>UPTIME</th><th>TARGET</th><th>ERROR</th><th>ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Config</h2>
+          <button id="toggleConfig" title="Настройки" aria-label="Настройки">⚙</button>
+        </div>
+        <div class="config-actions">
+          <button id="reloadConfig">Reload</button>
+          <button id="saveConfig">Save</button>
+          <button id="addProcess">Add process</button>
+        </div>
+        <div id="configPanel" class="config-panel">
+          <div class="config-grid">
+            <label>Check timing
+              <input id="cfgCheckTiming" placeholder="500ms" />
+            </label>
+            <label>Restart timing
+              <input id="cfgRestartTiming" placeholder="3s" />
+            </label>
+            <label>Launch in new console
+              <input id="cfgLaunchInNewConsole" type="checkbox" />
+            </label>
+            <label>Auto close error dialogs
+              <input id="cfgAutoCloseErrorDialogs" type="checkbox" />
+            </label>
+          </div>
+          <label>Error window titles
+            <input id="cfgErrorWindowTitles" />
+          </label>
+
+          <h3>Processes</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>NAME</th>
+                  <th>DISABLED</th>
+                  <th>TYPE</th>
+                  <th>PROCESS</th>
+                  <th>PATH</th>
+                  <th>COMMAND</th>
+                  <th>ARGS</th>
+                  <th>CHECKPROCESS</th>
+                  <th>CHECKCMDLINE</th>
+                  <th>MONITORHANG</th>
+                  <th>HANGTIMEOUT</th>
+                  <th>ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody id="configProcesses"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>

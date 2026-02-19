@@ -1,0 +1,11 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "goRunFiles Monitor",
+  "outputfilename": "goRunFilesWails",
+  "frontend:install": "",
+  "frontend:build": "",
+  "frontend:dev": "",
+  "frontend:dir": "frontend",
+  "assetdir": "frontend",
+  "wailsjsdir": "frontend"
+}
