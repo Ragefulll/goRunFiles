@@ -36,9 +36,9 @@ const render = (data) => {
       <td>${it.target || ""}</td>
       <td>${it.error || ""}</td>
       <td>
-        <button data-action="start" data-name="${it.name}">Start</button>
-        <button data-action="stop" data-name="${it.name}">Stop</button>
-        <button data-action="restart" data-name="${it.name}">Restart</button>
+        <button data-action="start" data-name="${it.name}">▶️</button>
+        <button data-action="stop" data-name="${it.name}">❌</button>
+        <button data-action="restart" data-name="${it.name}">🔄️</button>
       </td>
     `;
     tbody.appendChild(tr);
