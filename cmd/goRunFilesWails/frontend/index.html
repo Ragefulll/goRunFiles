@@ -52,34 +52,32 @@
               <input id="cfgAutoCloseErrorDialogs" type="checkbox" />
             </label>
           </div>
-          <label>Error window titles
+          <label class="full">Error window titles
             <input id="cfgErrorWindowTitles" />
           </label>
 
           <h3>Processes</h3>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>NAME</th>
-                  <th>DISABLED</th>
-                  <th>TYPE</th>
-                  <th>PROCESS</th>
-                  <th>PATH</th>
-                  <th>COMMAND</th>
-                  <th>ARGS</th>
-                  <th>CHECKPROCESS</th>
-                  <th>CHECKCMDLINE</th>
-                  <th>MONITORHANG</th>
-                  <th>HANGTIMEOUT</th>
-                  <th>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody id="configProcesses"></tbody>
-            </table>
-          </div>
+          <div id="configProcesses" class="process-list"></div>
         </div>
       </section>
+    </div>
+    <div id="authModal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-card">
+        <div class="modal-head">
+          <div>Config Access</div>
+          <button id="closeAuth" title="Закрыть">✕</button>
+        </div>
+        <div class="modal-body">
+          <label>Password
+            <input id="configPassword" type="password" placeholder="Введите пароль" />
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button id="unlockConfig">Unlock</button>
+          <button id="cancelAuth">Cancel</button>
+        </div>
+      </div>
     </div>
     <script src="app.js"></script>
   </body>
