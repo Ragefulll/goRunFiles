@@ -52,6 +52,16 @@ var (
 	cpuSamples = map[int]cpuSample{}
 )
 
+type netSample struct {
+	at    time.Time
+	bytes uint64
+}
+
+var (
+	netMu      sync.Mutex
+	netSamples = map[int]netSample{}
+)
+
 func cpuPercentFromSample(pid int, now time.Time, total float64) float64 {
 	cpuMu.Lock()
 	defer cpuMu.Unlock()
@@ -78,4 +88,58 @@ func cpuPercentFromSample(pid int, now time.Time, total float64) float64 {
 		return 0
 	}
 	return pct
+}
+
+// NetKBs returns approximate network throughput in KB/s for a PID.
+func NetKBs(pid int) float64 {
+	if pid <= 0 {
+		return 0
+	}
+	now := time.Now()
+	var rate float64
+	if useETWNetwork.Load() {
+		if total, ok := etwTotalBytes(pid); ok {
+			rate = netRateFromSample(pid, now, total)
+		}
+	}
+	p, err := process.NewProcess(int32(pid))
+	if err != nil {
+		return applyNetScale(rate)
+	}
+	io, err := p.IOCounters()
+	if err != nil {
+		return applyNetScale(rate)
+	}
+	var totalBytes uint64
+	totalBytes = io.ReadBytes + io.WriteBytes
+	rate = netRateFromSample(pid, now, totalBytes)
+	return applyNetScale(rate)
+}
+
+func netRateFromSample(pid int, now time.Time, total uint64) float64 {
+	netMu.Lock()
+	defer netMu.Unlock()
+
+	prev, ok := netSamples[pid]
+	netSamples[pid] = netSample{at: now, bytes: total}
+	if !ok {
+		return 0
+	}
+	dt := now.Sub(prev.at).Seconds()
+	if dt <= 0 {
+		return 0
+	}
+	delta := float64(total - prev.bytes)
+	if delta <= 0 {
+		return 0
+	}
+	return (delta / 1024.0) / dt
+}
+
+func applyNetScale(rate float64) float64 {
+	scale := getNetworkScale()
+	if scale <= 0 {
+		scale = 1
+	}
+	return rate / scale
 }

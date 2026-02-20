@@ -3,13 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>goRunFiles Monitor</title>
+    <title>ART3D Process Monitor</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <div class="wrap">
       <header class="head">
-        <div class="title">goRunFiles Monitor</div>
+        <div class="title">ART3D Process Monitor</div>
         <div class="meta">Updated: <span id="updated">—</span></div>
         <div class="meta">Version: <span id="version">—</span></div>
       </header>
@@ -17,13 +17,16 @@
       <section class="panel">
         <div class="panel-head">
           <h2>Processes</h2>
-          <button id="toggleConfig" title="Настройки" aria-label="Настройки">⚙</button>
+          <div class="panel-actions">
+            <button id="restartAll" title="Restart all" aria-label="Restart all">Restart All</button>
+            <button id="toggleConfig" title="Настройки" aria-label="Настройки">⚙</button>
+          </div>
         </div>
         <table>
           <thead>
             <tr>
               <th>NAME</th><th>TYPE</th><th>STATUS</th><th>PID</th>
-              <th>STARTED</th><th>UPTIME</th><th>CPU</th><th>GPU</th><th>RAM</th><th>TARGET</th><th>ERROR</th><th>ACTIONS</th>
+              <th>STARTED</th><th>UPTIME</th><th>CPU</th><th>GPU</th><th>RAM</th><th>NET</th><th>TARGET</th><th>ERROR</th><th>ACTIONS</th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>
@@ -69,6 +72,22 @@
             </label>
             <label>Restart timing
               <input id="cfgRestartTiming" placeholder="3s" />
+            </label>
+            <label>Use ETW network
+              <input id="cfgUseETWNetwork" type="checkbox" />
+            </label>
+            <label>Net unit
+              <select id="cfgNetUnit">
+                <option value="KB">KB/s</option>
+                <option value="MB">MB/s</option>
+              </select>
+            </label>
+            <label>Net scale
+              <select id="cfgNetScale">
+                <option value="1">1</option>
+                <option value="100">/100</option>
+                <option value="1000">/1000</option>
+              </select>
             </label>
             <label>Launch in new console
               <input id="cfgLaunchInNewConsole" type="checkbox" />

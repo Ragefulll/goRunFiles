@@ -6,6 +6,7 @@ const tbody = document.getElementById("tbody");
 const reloadBtn = document.getElementById("reloadConfig");
 const saveBtn = document.getElementById("saveConfig");
 const toggleBtn = document.getElementById("toggleConfig");
+const restartAllBtn = document.getElementById("restartAll");
 const addProcessBtn = document.getElementById("addProcess");
 const configPanel = document.getElementById("configPanel");
 const configPassword = document.getElementById("configPassword");
@@ -18,6 +19,9 @@ const closeConfig = document.getElementById("closeConfig");
 
 const cfgCheckTiming = document.getElementById("cfgCheckTiming");
 const cfgRestartTiming = document.getElementById("cfgRestartTiming");
+const cfgUseETWNetwork = document.getElementById("cfgUseETWNetwork");
+const cfgNetUnit = document.getElementById("cfgNetUnit");
+const cfgNetScale = document.getElementById("cfgNetScale");
 const cfgLaunchInNewConsole = document.getElementById("cfgLaunchInNewConsole");
 const cfgAutoCloseErrorDialogs = document.getElementById("cfgAutoCloseErrorDialogs");
 const cfgErrorWindowTitles = document.getElementById("cfgErrorWindowTitles");
@@ -30,17 +34,19 @@ let sparkSeq = 0;
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
-const pushMetric = (name, cpu, gpu, mem) => {
+const pushMetric = (name, cpu, gpu, mem, net) => {
   if (!metricHistory.has(name)) {
-    metricHistory.set(name, { cpu: [], gpu: [], mem: [] });
+    metricHistory.set(name, { cpu: [], gpu: [], mem: [], net: [] });
   }
   const h = metricHistory.get(name);
   h.cpu.push(cpu);
   h.gpu.push(gpu);
   h.mem.push(mem);
+  h.net.push(net);
   if (h.cpu.length > HISTORY_LEN) h.cpu.shift();
   if (h.gpu.length > HISTORY_LEN) h.gpu.shift();
   if (h.mem.length > HISTORY_LEN) h.mem.shift();
+  if (h.net.length > HISTORY_LEN) h.net.shift();
 };
 
 const buildSparkline = (values, color) => {
@@ -74,6 +80,7 @@ const render = (data) => {
   if (!data) return;
   elUpdated.textContent = data.updated || "—";
   elVersion.textContent = data.version || "—";
+  const netUnit = (data.net_unit || "KB").toUpperCase();
   tbody.innerHTML = "";
 
   const prevMap = new Map();
@@ -92,11 +99,17 @@ const render = (data) => {
     const cpuVal = parseFloat(it.cpu || "0") || 0;
     const gpuVal = parseFloat(it.gpu || "0") || 0;
     const memVal = parseFloat(it.mem_mb || "0") || 0;
-    pushMetric(it.name, cpuVal, gpuVal, memVal);
-    const hist = metricHistory.get(it.name) || { cpu: [], gpu: [], mem: [] };
+    const netVal = parseFloat(it.net_kbs || "0") || 0;
+    const netUnitUpper = (data.net_unit || "KB").toUpperCase();
+    const netIsMB = netUnitUpper === "MB";
+    const netKBVal = netIsMB ? netVal * 1024 : netVal;
+    const netMBVal = netIsMB ? netVal : netVal / 1024;
+    pushMetric(it.name, cpuVal, gpuVal, memVal, netVal);
+    const hist = metricHistory.get(it.name) || { cpu: [], gpu: [], mem: [], net: [] };
     const cpuSpark = buildSparkline(hist.cpu, "#67e8f9");
     const gpuSpark = buildSparkline(hist.gpu, "#fca5a5");
     const memSpark = buildSparkline(hist.mem, "#a7f3d0");
+    const netSpark = buildSparkline(hist.net, "#c4b5fd");
 
     tr.innerHTML = `
       <td>${it.name || ""}</td>
@@ -121,6 +134,12 @@ const render = (data) => {
         <div class="metric-wrap">
           <span class="metric-val">${memVal.toFixed(0)}MB</span>
           ${memSpark}
+        </div>
+      </td>
+      <td class="metric" title="NET: ${netKBVal.toFixed(1)} KB/s | ${netMBVal.toFixed(2)} MB/s">
+        <div class="metric-wrap">
+          <span class="metric-val">${netVal.toFixed(0)}${netUnit}</span>
+          ${netSpark}
         </div>
       </td>
       <td>${it.target || ""}</td>
@@ -158,11 +177,23 @@ tbody.addEventListener("click", async (e) => {
   }
 });
 
+restartAllBtn.addEventListener("click", async () => {
+  if (!api) return;
+  try {
+    await api.RestartAll();
+  } catch (err) {
+    console.error(err);
+  }
+});
+
 const renderConfig = (model) => {
   if (!model) return;
   const s = model.settings || {};
   cfgCheckTiming.value = s.checkTiming || "";
   cfgRestartTiming.value = s.restartTiming || "";
+  cfgUseETWNetwork.checked = !!s.useETWNetwork;
+  cfgNetUnit.value = (s.netUnit || "KB").toUpperCase();
+  cfgNetScale.value = String(s.netScale || "1");
   cfgLaunchInNewConsole.checked = !!s.launchInNewConsole;
   cfgAutoCloseErrorDialogs.checked = !!s.autoCloseErrorDialogs;
   cfgErrorWindowTitles.value = s.errorWindowTitles || "";
@@ -251,6 +282,9 @@ const collectConfig = () => {
     settings: {
       checkTiming: cfgCheckTiming.value,
       restartTiming: cfgRestartTiming.value,
+      useETWNetwork: cfgUseETWNetwork.checked,
+      netUnit: cfgNetUnit.value,
+      netScale: cfgNetScale.value,
       launchInNewConsole: cfgLaunchInNewConsole.checked,
       autoCloseErrorDialogs: cfgAutoCloseErrorDialogs.checked,
       errorWindowTitles: cfgErrorWindowTitles.value,

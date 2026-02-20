@@ -15,9 +15,9 @@ const (
 func (s Status) Icon() string {
 	switch s {
 	case StatusRunning:
-		return "★ WORK    ︎"
+		return "★ RUN    ︎ "
 	case StatusStarted:
-		return "☆︎ RUN     "
+		return "☆︎ START   "
 	case StatusStopped:
 		return "✗︎ NRUN    "
 	case StatusDisabled:

@@ -1,6 +1,6 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "goRunFiles Monitor",
+  "name": "ART3D Process Monitor",
   "outputfilename": "goRunFiles",
   "frontend:install": "",
   "frontend:build": "",

@@ -30,6 +30,7 @@ type App struct {
 	lastRenderWidth int
 	restartAt       map[string]time.Time
 	hungSince       map[string]time.Time
+	manualStop      map[string]bool
 	mu              sync.Mutex
 }
 
@@ -37,7 +38,7 @@ func New(cfg config.Config, logger *log.Logger, version string) *App {
 	if logger == nil {
 		logger = log.Default()
 	}
-	return &App{
+	app := &App{
 		cfg:        cfg,
 		logger:     logger,
 		last:       make(map[string]Status),
@@ -45,7 +46,11 @@ func New(cfg config.Config, logger *log.Logger, version string) *App {
 		startTimes: make(map[int]int64),
 		restartAt:  make(map[string]time.Time),
 		hungSince:  make(map[string]time.Time),
+		manualStop: make(map[string]bool),
 	}
+	process.SetNetworkConfig(cfg.Settings.UseETWNetwork)
+	process.SetNetworkScale(cfg.Settings.NetScale)
+	return app
 }
 
 func (a *App) Run(ctx context.Context) error {
@@ -100,7 +105,7 @@ func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot
 
 	now := time.Now()
 	statuses := a.computeStatuses(true, now)
-	onUpdate(buildDisplaySnapshot(a.version, statuses, now))
+	onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.NetUnit))
 
 	checkTicker := time.NewTicker(a.cfg.Settings.CheckTiming.Duration)
 	defer checkTicker.Stop()
@@ -115,11 +120,11 @@ func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot
 		case <-checkTicker.C:
 			now := time.Now()
 			statuses := a.computeStatuses(false, now)
-			onUpdate(buildDisplaySnapshot(a.version, statuses, now))
+			onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.NetUnit))
 		case <-restartTicker.C:
 			now := time.Now()
 			statuses := a.computeStatuses(true, now)
-			onUpdate(buildDisplaySnapshot(a.version, statuses, now))
+			onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.NetUnit))
 		}
 	}
 }
@@ -199,7 +204,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			}
 		case config.TypeCmd:
 			if strings.TrimSpace(item.CheckCmdline) != "" {
-				ok, pid, err := process.ByNameAndCmdlineContains(item.CheckProcess, item.CheckCmdline)
+				ok, pid, err := process.ByNameAndCmdlineArgsExact(item.CheckProcess, item.CheckCmdline)
 				if err != nil {
 					status.Err = err.Error()
 				}
@@ -235,7 +240,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 				checkCmdline = item.Process
 			}
 			if checkCmdline != "" {
-				ok, pid, err := process.ByNameAndCmdlineContains(item.CheckProcess, checkCmdline)
+				ok, pid, err := process.ByNameAndCmdlineArgsExact(item.CheckProcess, checkCmdline)
 				if err != nil {
 					status.Err = err.Error()
 				}
@@ -270,6 +275,9 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 		}
 
 		if alive {
+			if a.manualStop[name] {
+				delete(a.manualStop, name)
+			}
 			if a.last[name] == StatusStarted {
 				status.Status = StatusStarted
 				a.last[name] = StatusRunning
@@ -285,6 +293,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			if metricsPid > 0 {
 				status.Cpu = process.CPUPercent(metricsPid)
 				status.MemMB = process.MemoryMB(metricsPid)
+				status.NetKBs = process.NetKBs(metricsPid)
 				if gpu, ok := gpuByPid[metricsPid]; ok {
 					status.Gpu = gpu.Util
 					status.GpuMemMB = gpu.MemMB
@@ -299,6 +308,14 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 
 		status.Status = StatusStopped
 		a.last[name] = StatusStopped
+
+		if a.manualStop[name] {
+			status.Uptime = "-"
+			status.StartedAt = "-"
+			delete(a.restartAt, name)
+			statuses = append(statuses, status)
+			continue
+		}
 
 		if _, ok := a.restartAt[name]; !ok {
 			a.restartAt[name] = now.Add(a.cfg.Settings.RestartTiming.Duration)
@@ -343,6 +360,9 @@ func (a *App) UpdateConfig(cfg config.Config) {
 	a.startTimes = make(map[int]int64)
 	a.restartAt = make(map[string]time.Time)
 	a.hungSince = make(map[string]time.Time)
+	a.manualStop = make(map[string]bool)
+	process.SetNetworkConfig(cfg.Settings.UseETWNetwork)
+	process.SetNetworkScale(cfg.Settings.NetScale)
 }
 
 // StartProcess starts a process by config name.
@@ -362,6 +382,7 @@ func (a *App) StartProcess(name string) error {
 	}
 	item.Pid = pid
 	a.last[name] = StatusStarted
+	delete(a.manualStop, name)
 	return nil
 }
 
@@ -373,6 +394,8 @@ func (a *App) StopProcess(name string) error {
 	if !ok {
 		return fmt.Errorf("process %q not found", name)
 	}
+	a.manualStop[name] = true
+	delete(a.restartAt, name)
 	return stopProcessItem(item)
 }
 
@@ -381,7 +404,43 @@ func (a *App) RestartProcess(name string) error {
 	if err := a.StopProcess(name); err != nil {
 		return err
 	}
+	delete(a.manualStop, name)
 	return a.StartProcess(name)
+}
+
+// RestartAll restarts all enabled processes.
+func (a *App) RestartAll() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	var lastErr error
+	a.manualStop = make(map[string]bool)
+	// stop enabled
+	for _, item := range a.cfg.Process {
+		if item.Disabled {
+			continue
+		}
+		if err := stopProcessItem(item); err != nil {
+			lastErr = err
+		}
+	}
+	// start enabled
+	for name, item := range a.cfg.Process {
+		if item.Disabled {
+			continue
+		}
+		pid, err := runner.Start(item, a.cfg.Settings.LaunchInNewConsole)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		item.Pid = pid
+		a.last[name] = StatusStarted
+		if pid > 0 {
+			a.startTimes[pid] = time.Now().UnixMilli()
+		}
+	}
+	return lastErr
 }
 
 // StopAll stops all configured processes (including disabled).
@@ -410,6 +469,7 @@ type procStatus struct {
 	Gpu       float64
 	GpuMemMB  int
 	MemMB     int
+	NetKBs    float64
 	Err       string
 }
 
@@ -615,6 +675,9 @@ func stopProcessItem(item *config.ProcessItem) error {
 		item.Pid = 0
 		return nil
 	case config.TypeCmd, config.TypeBat:
+		if strings.TrimSpace(item.CheckCmdline) != "" {
+			return process.KillByNameAndCmdlineArgsExact(item.CheckProcess, item.CheckCmdline)
+		}
 		if strings.TrimSpace(item.CheckProcess) != "" {
 			names := parseProcessList("", item.CheckProcess)
 			if err := process.KillByNames(names); err != nil {

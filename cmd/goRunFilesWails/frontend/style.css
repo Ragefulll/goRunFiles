@@ -37,7 +37,7 @@
   background: #334155;
 }
 body { margin: 0; background: var(--bg); color: var(--text); }
-.wrap { max-width: 1400px; margin: 24px auto; padding: 0 16px; }
+.wrap { max-width: 1600px; margin: 24px auto; padding: 0 16px; }
 .head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .title { font-size: 20px; font-weight: 600; letter-spacing: .5px; }
 .meta { color: var(--muted); }
@@ -46,6 +46,8 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 .panel h2 { margin: 0; font-size: 14px; color: var(--muted); letter-spacing: .4px; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 #toggleConfig { font-size: 16px; padding: 4px 8px; }
+.panel-actions { display: flex; align-items: center; gap: 8px; }
+#restartAll { font-size: 12px; padding: 6px 10px; border: 1px solid var(--grid); background: #0b0f14; }
 .panel.hidden { display: none; }
 
 table { width: 100%; border-collapse: collapse; }
@@ -66,13 +68,16 @@ tr.hung { background: var(--hung); }
 .row-disabled { opacity: 0.4; }
 .metric { min-width: 160px; }
 .metric-wrap {
-  display: flex;
+  display: grid;
+  grid-template-columns: 64px 1fr;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 .metric-val {
-  min-width: 34px;
+  width: 64px;
   color: var(--text);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 .spark {
   display: block;

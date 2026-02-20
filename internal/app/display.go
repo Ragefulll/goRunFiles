@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -21,16 +22,21 @@ type DisplayStatus struct {
 	Gpu       string `json:"gpu"`
 	GpuMemMB  string `json:"gpu_mem_mb"`
 	MemMB     string `json:"mem_mb"`
+	NetKBs    string `json:"net_kbs"`
 }
 
 // DisplaySnapshot is a UI-friendly snapshot of the current system state.
 type DisplaySnapshot struct {
 	Updated string          `json:"updated"`
 	Version string          `json:"version"`
+	NetUnit string          `json:"net_unit"`
 	Items   []DisplayStatus `json:"items"`
 }
 
-func buildDisplaySnapshot(version string, statuses []procStatus, now time.Time) DisplaySnapshot {
+func buildDisplaySnapshot(version string, statuses []procStatus, now time.Time, netUnit string) DisplaySnapshot {
+	if strings.TrimSpace(netUnit) == "" {
+		netUnit = "KB"
+	}
 	items := make([]DisplayStatus, 0, len(statuses))
 	for _, s := range statuses {
 		items = append(items, DisplayStatus{
@@ -48,11 +54,13 @@ func buildDisplaySnapshot(version string, statuses []procStatus, now time.Time) 
 			Gpu:       formatPercent(s.Gpu),
 			GpuMemMB:  formatMemMB(s.GpuMemMB),
 			MemMB:     formatMemMB(s.MemMB),
+			NetKBs:    formatRate(s.NetKBs, netUnit),
 		})
 	}
 	return DisplaySnapshot{
 		Updated: now.Format("2006-01-02 15:04:05"),
 		Version: version,
+		NetUnit: netUnit,
 		Items:   items,
 	}
 }
@@ -72,4 +80,17 @@ func formatMemMB(v int) string {
 		return "0"
 	}
 	return fmt.Sprintf("%d", v)
+}
+
+func formatRate(v float64, unit string) string {
+	if v <= 0 {
+		return "0"
+	}
+	if strings.EqualFold(unit, "MB") || strings.EqualFold(unit, "MB/s") {
+		v = v / 1024.0
+		if v < 10 {
+			return fmt.Sprintf("%.1f", v)
+		}
+	}
+	return fmt.Sprintf("%.0f", v)
 }

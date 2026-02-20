@@ -51,7 +51,7 @@ func main() {
 	}
 
 	err = wails.Run(&options.App{
-		Title:  "goRunFiles Monitor",
+		Title:  "ART3D Process Monitor",
 		Width:  1600,
 		Height: 900,
 		AssetServer: &assetserver.Options{
@@ -63,7 +63,7 @@ func main() {
 			}()
 		},
 		OnShutdown: func(ctx context.Context) {
-			_ = gui.mon.StopAll()
+			// Keep child processes running after UI closes.
 		},
 		Bind: []interface{}{gui},
 	})
@@ -130,6 +130,11 @@ func (g *GUI) Stop(name string) error {
 // Restart restarts a process by config name.
 func (g *GUI) Restart(name string) error {
 	return g.mon.RestartProcess(name)
+}
+
+// RestartAll restarts all enabled processes.
+func (g *GUI) RestartAll() error {
+	return g.mon.RestartAll()
 }
 
 // GetConfig returns the current config.ini content.

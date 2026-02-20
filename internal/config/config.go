@@ -34,11 +34,14 @@ type ProcessItem struct {
 }
 
 type Settings struct {
-	CheckTiming Duration
-	RestartTiming Duration
-	LaunchInNewConsole bool
+	CheckTiming           Duration
+	RestartTiming         Duration
+	LaunchInNewConsole    bool
 	AutoCloseErrorDialogs bool
-	ErrorWindowTitles string
+	ErrorWindowTitles     string
+	UseETWNetwork         bool
+	NetUnit               string
+	NetScale              float64
 }
 
 // Config Вся конфигурация

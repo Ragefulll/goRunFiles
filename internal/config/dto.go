@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -23,11 +24,14 @@ type ProcessDTO struct {
 
 // SettingsDTO is a UI-friendly view of Settings.
 type SettingsDTO struct {
-	CheckTiming          string `json:"checkTiming"`
-	RestartTiming        string `json:"restartTiming"`
-	LaunchInNewConsole   bool   `json:"launchInNewConsole"`
-	AutoCloseErrorDialogs bool  `json:"autoCloseErrorDialogs"`
-	ErrorWindowTitles    string `json:"errorWindowTitles"`
+	CheckTiming           string `json:"checkTiming"`
+	RestartTiming         string `json:"restartTiming"`
+	LaunchInNewConsole    bool   `json:"launchInNewConsole"`
+	AutoCloseErrorDialogs bool   `json:"autoCloseErrorDialogs"`
+	ErrorWindowTitles     string `json:"errorWindowTitles"`
+	UseETWNetwork         bool   `json:"useETWNetwork"`
+	NetUnit               string `json:"netUnit"`
+	NetScale              string `json:"netScale"`
 }
 
 // ConfigDTO is a UI-friendly view of Config.
@@ -52,6 +56,9 @@ func ToDTO(cfg Config) ConfigDTO {
 			LaunchInNewConsole:    cfg.Settings.LaunchInNewConsole,
 			AutoCloseErrorDialogs: cfg.Settings.AutoCloseErrorDialogs,
 			ErrorWindowTitles:     cfg.Settings.ErrorWindowTitles,
+			UseETWNetwork:         cfg.Settings.UseETWNetwork,
+			NetUnit:               cfg.Settings.NetUnit,
+			NetScale:              floatToString(cfg.Settings.NetScale),
 		},
 	}
 
@@ -94,6 +101,9 @@ func FromDTO(dto ConfigDTO) (Config, error) {
 	cfg.Settings.LaunchInNewConsole = dto.Settings.LaunchInNewConsole
 	cfg.Settings.AutoCloseErrorDialogs = dto.Settings.AutoCloseErrorDialogs
 	cfg.Settings.ErrorWindowTitles = dto.Settings.ErrorWindowTitles
+	cfg.Settings.UseETWNetwork = dto.Settings.UseETWNetwork
+	cfg.Settings.NetUnit = strings.TrimSpace(dto.Settings.NetUnit)
+	cfg.Settings.NetScale = parseFloatOrZero(dto.Settings.NetScale)
 
 	for _, p := range dto.Processes {
 		name := strings.TrimSpace(p.Name)
@@ -130,4 +140,23 @@ func durString(d Duration) string {
 		return ""
 	}
 	return d.Duration.String()
+}
+
+func floatToString(v float64) string {
+	if v == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%.0f", v)
+}
+
+func parseFloatOrZero(s string) float64 {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0
+	}
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0
+	}
+	return v
 }
