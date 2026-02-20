@@ -1,3 +1,3 @@
 package main
 
-const generatedVersion = "2.0.80"
+const generatedVersion = "2.0.81"

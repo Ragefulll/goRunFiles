@@ -25,6 +25,7 @@ func Start(item *config.ProcessItem, launchInNewConsole bool) (int, error) {
 		args := splitArgs(item.Args)
 		cmd := exec.Command(processPath, args...)
 		cmd.Dir = filepath.Dir(processPath)
+		hideWindow(cmd)
 
 		if err := cmd.Start(); err != nil {
 			return 0, err
