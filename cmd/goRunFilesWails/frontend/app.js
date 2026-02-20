@@ -42,6 +42,7 @@ const render = (data) => {
     const prev = prevMap.get(it.name) || {};
     const tr = document.createElement("tr");
     if (it.hung) tr.classList.add("hung");
+    if (it.status === "disabled") tr.classList.add("row-disabled");
 
     tr.innerHTML = `
       <td>${it.name || ""}</td>

@@ -62,6 +62,7 @@ tr.hung { background: var(--hung); }
 .started { color: var(--warn); }
 .stopped, .unknown { color: var(--bad); }
 .disabled { color: var(--muted); }
+.row-disabled { opacity: 0.4; }
 
 button {
   /*background: #1f2937;*/
