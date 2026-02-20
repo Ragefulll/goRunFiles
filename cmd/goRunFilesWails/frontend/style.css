@@ -20,6 +20,21 @@
 }
 
 * { box-sizing: border-box; }
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: #0b0f14;
+}
+*::-webkit-scrollbar-thumb {
+  background: #263244;
+  border-radius: 8px;
+  border: 2px solid #0b0f14;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
 body { margin: 0; background: var(--bg); color: var(--text); }
 .wrap { max-width: 1280px; margin: 24px auto; padding: 0 16px; }
 .head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
@@ -30,6 +45,7 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 .panel h2 { margin: 0; font-size: 14px; color: var(--muted); letter-spacing: .4px; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 #toggleConfig { font-size: 16px; padding: 4px 8px; }
+.panel.hidden { display: none; }
 
 table { width: 100%; border-collapse: collapse; }
 th, td {
@@ -172,6 +188,12 @@ label input, .config-panel input[type="text"], .config-panel input[type="number"
   background: var(--panel);
   border: 1px solid var(--grid);
   padding: 12px;
+}
+.modal-card.modal-wide {
+  width: 90vw;
+  max-width: 1280px;
+  max-height: 85vh;
+  overflow-y: auto;
 }
 .modal-head {
   display: flex;

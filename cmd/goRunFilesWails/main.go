@@ -32,8 +32,17 @@ func main() {
 	configPath := resolveConfigPath()
 	cfg, err := config.Load(configPath)
 	if err != nil {
-		log.Printf("%s [ART3D-CHEKER]: Ошибка загрузки конфига: %v", app.LogTag, err)
-		return
+		if _, repErr := config.RepairFile(configPath); repErr == nil {
+			if cfg2, err2 := config.Load(configPath); err2 == nil {
+				cfg = cfg2
+			} else {
+				log.Printf("%s [ART3D-CHEKER]: Ошибка загрузки конфига: %v", app.LogTag, err2)
+				return
+			}
+		} else {
+			log.Printf("%s [ART3D-CHEKER]: Ошибка загрузки конфига: %v", app.LogTag, err)
+			return
+		}
 	}
 
 	gui := &GUI{

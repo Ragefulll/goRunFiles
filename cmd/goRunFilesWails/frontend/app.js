@@ -13,6 +13,8 @@ const unlockBtn = document.getElementById("unlockConfig");
 const authModal = document.getElementById("authModal");
 const closeAuth = document.getElementById("closeAuth");
 const cancelAuth = document.getElementById("cancelAuth");
+const configModal = document.getElementById("configModal");
+const closeConfig = document.getElementById("closeConfig");
 
 const cfgCheckTiming = document.getElementById("cfgCheckTiming");
 const cfgRestartTiming = document.getElementById("cfgRestartTiming");
@@ -203,12 +205,8 @@ saveBtn.addEventListener("click", async () => {
 });
 
 toggleBtn.addEventListener("click", () => {
-  if (configPanel.classList.contains("hidden")) {
-    lockConfig();
-    openAuthModal();
-  } else {
-    lockConfig();
-  }
+  lockConfig();
+  openAuthModal();
 });
 
 setInterval(tick, 500);
@@ -249,6 +247,7 @@ const lockConfig = () => {
   document.querySelector(".config-actions").classList.add("hidden");
   configPassword.value = "";
   configPanel.classList.add("hidden");
+  configModal.classList.add("hidden");
 };
 
 const unlockConfig = async () => {
@@ -262,6 +261,7 @@ const unlockConfig = async () => {
   document.querySelector(".process-list").classList.remove("hidden");
   document.querySelector(".config-actions").classList.remove("hidden");
   configPanel.classList.remove("hidden");
+  configModal.classList.remove("hidden");
   const model = await api.GetConfigModel();
   renderConfig(model);
 };
@@ -283,6 +283,15 @@ cancelAuth.addEventListener("click", closeAuthModal);
 authModal.addEventListener("click", (e) => {
   if (e.target.classList.contains("modal-backdrop")) {
     closeAuthModal();
+  }
+});
+
+closeConfig.addEventListener("click", () => {
+  lockConfig();
+});
+configModal.addEventListener("click", (e) => {
+  if (e.target.classList.contains("modal-backdrop")) {
+    lockConfig();
   }
 });
 
