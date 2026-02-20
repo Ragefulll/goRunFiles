@@ -52,8 +52,8 @@ func main() {
 
 	err = wails.Run(&options.App{
 		Title:  "goRunFiles Monitor",
-		Width:  1200,
-		Height: 700,
+		Width:  1600,
+		Height: 900,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

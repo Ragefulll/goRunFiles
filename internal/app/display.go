@@ -1,6 +1,9 @@
 package app
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // DisplayStatus is a stable, UI-friendly view of procStatus.
 type DisplayStatus struct {
@@ -14,6 +17,10 @@ type DisplayStatus struct {
 	Target    string `json:"target"`
 	Error     string `json:"error"`
 	Hung      bool   `json:"hung"`
+	Cpu       string `json:"cpu"`
+	Gpu       string `json:"gpu"`
+	GpuMemMB  string `json:"gpu_mem_mb"`
+	MemMB     string `json:"mem_mb"`
 }
 
 // DisplaySnapshot is a UI-friendly snapshot of the current system state.
@@ -37,6 +44,10 @@ func buildDisplaySnapshot(version string, statuses []procStatus, now time.Time) 
 			Target:    s.Target,
 			Error:     s.Err,
 			Hung:      s.Hung,
+			Cpu:       formatPercent(s.Cpu),
+			Gpu:       formatPercent(s.Gpu),
+			GpuMemMB:  formatMemMB(s.GpuMemMB),
+			MemMB:     formatMemMB(s.MemMB),
 		})
 	}
 	return DisplaySnapshot{
@@ -44,4 +55,21 @@ func buildDisplaySnapshot(version string, statuses []procStatus, now time.Time) 
 		Version: version,
 		Items:   items,
 	}
+}
+
+func formatPercent(v float64) string {
+	if v <= 0 {
+		return "0"
+	}
+	if v >= 999 {
+		return "999"
+	}
+	return fmt.Sprintf("%.0f", v)
+}
+
+func formatMemMB(v int) string {
+	if v <= 0 {
+		return "0"
+	}
+	return fmt.Sprintf("%d", v)
 }

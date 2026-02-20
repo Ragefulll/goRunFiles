@@ -142,12 +142,15 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 	}
 	sort.Strings(names)
 
+	gpuByPid := process.GpuStatsByPid()
+
 	for _, name := range names {
 		item := a.cfg.Process[name]
 		status := procStatus{
 			Name: name,
 			Type: item.Type,
 		}
+		var namesToCheck []string
 		if item.Disabled {
 			status.Status = StatusDisabled
 			status.Err = ""
@@ -161,7 +164,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			if pathErr := validatePath(item.Path, item.Process); pathErr != "" {
 				status.Err = pathErr
 			}
-			namesToCheck := parseProcessList(item.Process, item.CheckProcess)
+			namesToCheck = parseProcessList(item.Process, item.CheckProcess)
 			for _, procName := range namesToCheck {
 				ok, pid, err := process.ByName(procName)
 				if err != nil {
@@ -275,6 +278,18 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 				a.last[name] = StatusRunning
 			}
 			status.Pid = item.Pid
+			metricsPid := status.Pid
+			if status.Type == config.TypeExe {
+				metricsPid = preferShippingPid(namesToCheck, status.Pid)
+			}
+			if metricsPid > 0 {
+				status.Cpu = process.CPUPercent(metricsPid)
+				status.MemMB = process.MemoryMB(metricsPid)
+				if gpu, ok := gpuByPid[metricsPid]; ok {
+					status.Gpu = gpu.Util
+					status.GpuMemMB = gpu.MemMB
+				}
+			}
 			a.fillTimes(&status, now)
 			delete(a.restartAt, name)
 			delete(a.hungSince, name)
@@ -391,6 +406,10 @@ type procStatus struct {
 	StartedAt string
 	Uptime    string
 	Hung      bool
+	Cpu       float64
+	Gpu       float64
+	GpuMemMB  int
+	MemMB     int
 	Err       string
 }
 
@@ -449,6 +468,18 @@ func parseCSV(raw string) []string {
 		out = append(out, p)
 	}
 	return out
+}
+
+func preferShippingPid(namesToCheck []string, fallback int) int {
+	for _, name := range namesToCheck {
+		if strings.Contains(strings.ToLower(name), "win64-shipping.exe") {
+			ok, pid, _ := process.ByName(name)
+			if ok && pid > 0 {
+				return pid
+			}
+		}
+	}
+	return fallback
 }
 
 func (a *App) buildAutoErrorTitles() []string {

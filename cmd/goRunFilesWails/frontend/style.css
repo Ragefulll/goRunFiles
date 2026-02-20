@@ -9,12 +9,13 @@
   --hung: rgba(239, 68, 68, 0.2);
   --grid: #232a34;
   font-family: "bahnschrift", "Segoe UI", "Consolas", ui-monospace, Menlo, monospace;
+  font-synthesis: none;
 }
 
 @font-face {
   font-family: "bahnschrift";
   src: url("fonts/bahnschrift.ttf") format("opentype");
-  font-weight: 100;
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
@@ -36,9 +37,9 @@
   background: #334155;
 }
 body { margin: 0; background: var(--bg); color: var(--text); }
-.wrap { max-width: 1280px; margin: 24px auto; padding: 0 16px; }
+.wrap { max-width: 1400px; margin: 24px auto; padding: 0 16px; }
 .head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.title { font-size: 20px; font-weight: 700; letter-spacing: .5px; }
+.title { font-size: 20px; font-weight: 600; letter-spacing: .5px; }
 .meta { color: var(--muted); }
 
 .panel { margin-top: 18px; background: var(--panel); border: 1px solid var(--grid); padding: 12px; }
@@ -55,14 +56,28 @@ th, td {
   font-size: 12px;
   white-space: nowrap;
 }
-th { color: var(--muted); font-weight: 600; }
+th { color: var(--muted); font-weight: 400; }
 tr.hung { background: var(--hung); }
-.status { font-weight: 700; }
+.status { font-weight: 400; }
 .running { color: var(--ok); }
 .started { color: var(--warn); }
 .stopped, .unknown { color: var(--bad); }
 .disabled { color: var(--muted); }
 .row-disabled { opacity: 0.4; }
+.metric { min-width: 160px; }
+.metric-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.metric-val {
+  min-width: 34px;
+  color: var(--text);
+}
+.spark {
+  display: block;
+  opacity: 0.85;
+}
 
 button {
   /*background: #1f2937;*/

@@ -24,6 +24,51 @@ const cfgErrorWindowTitles = document.getElementById("cfgErrorWindowTitles");
 const cfgProcesses = document.getElementById("configProcesses");
 
 let lastSnapshot = null;
+const HISTORY_LEN = 40;
+const metricHistory = new Map();
+let sparkSeq = 0;
+
+const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+const pushMetric = (name, cpu, gpu, mem) => {
+  if (!metricHistory.has(name)) {
+    metricHistory.set(name, { cpu: [], gpu: [], mem: [] });
+  }
+  const h = metricHistory.get(name);
+  h.cpu.push(cpu);
+  h.gpu.push(gpu);
+  h.mem.push(mem);
+  if (h.cpu.length > HISTORY_LEN) h.cpu.shift();
+  if (h.gpu.length > HISTORY_LEN) h.gpu.shift();
+  if (h.mem.length > HISTORY_LEN) h.mem.shift();
+};
+
+const buildSparkline = (values, color) => {
+  const id = `grad-${sparkSeq++}`;
+  const w = 90;
+  const h = 26;
+  const maxPoints = Math.max(values.length, 2);
+  const step = w / (maxPoints - 1);
+  const pts = values.map((v, i) => {
+    const x = i * step;
+    const y = h - (clamp(v, 0, 100) / 100) * h;
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  });
+  const poly = pts.join(" ");
+  const area = `0,${h} ${poly} ${w},${h}`;
+  return `
+    <svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" class="spark">
+      <defs>
+        <linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${color}" stop-opacity="0.55" />
+          <stop offset="100%" stop-color="${color}" stop-opacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points="${area}" fill="url(#${id})" />
+      <polyline points="${poly}" fill="none" stroke="${color}" stroke-width="2" />
+    </svg>
+  `;
+};
 
 const render = (data) => {
   if (!data) return;
@@ -44,6 +89,15 @@ const render = (data) => {
     if (it.hung) tr.classList.add("hung");
     if (it.status === "disabled") tr.classList.add("row-disabled");
 
+    const cpuVal = parseFloat(it.cpu || "0") || 0;
+    const gpuVal = parseFloat(it.gpu || "0") || 0;
+    const memVal = parseFloat(it.mem_mb || "0") || 0;
+    pushMetric(it.name, cpuVal, gpuVal, memVal);
+    const hist = metricHistory.get(it.name) || { cpu: [], gpu: [], mem: [] };
+    const cpuSpark = buildSparkline(hist.cpu, "#67e8f9");
+    const gpuSpark = buildSparkline(hist.gpu, "#fca5a5");
+    const memSpark = buildSparkline(hist.mem, "#a7f3d0");
+
     tr.innerHTML = `
       <td>${it.name || ""}</td>
       <td>${it.type || ""}</td>
@@ -51,6 +105,24 @@ const render = (data) => {
       <td>${it.pid || "-"}</td>
       <td>${it.started_at || "-"}</td>
       <td>${it.uptime || "-"}</td>
+      <td class="metric">
+        <div class="metric-wrap">
+          <span class="metric-val">${cpuVal.toFixed(0)}%</span>
+          ${cpuSpark}
+        </div>
+      </td>
+      <td class="metric" title="GPU memory: ${it.gpu_mem_mb || 0} MB">
+        <div class="metric-wrap">
+          <span class="metric-val">${gpuVal.toFixed(0)}%</span>
+          ${gpuSpark}
+        </div>
+      </td>
+      <td class="metric" title="RAM: ${memVal.toFixed(0)} MB">
+        <div class="metric-wrap">
+          <span class="metric-val">${memVal.toFixed(0)}MB</span>
+          ${memSpark}
+        </div>
+      </td>
       <td>${it.target || ""}</td>
       <td>${it.error || ""}</td>
       <td>
