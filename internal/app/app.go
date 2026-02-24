@@ -25,6 +25,7 @@ type App struct {
 	logger          *log.Logger
 	last            map[string]Status
 	version         string
+	defaultDisabled map[string]bool
 	startTimes      map[int]int64
 	lastRenderLines int
 	lastRenderWidth int
@@ -39,14 +40,15 @@ func New(cfg config.Config, logger *log.Logger, version string) *App {
 		logger = log.Default()
 	}
 	app := &App{
-		cfg:        cfg,
-		logger:     logger,
-		last:       make(map[string]Status),
-		version:    version,
-		startTimes: make(map[int]int64),
-		restartAt:  make(map[string]time.Time),
-		hungSince:  make(map[string]time.Time),
-		manualStop: make(map[string]bool),
+		cfg:             cfg,
+		logger:          logger,
+		last:            make(map[string]Status),
+		version:         version,
+		defaultDisabled: buildDefaultDisabledMap(cfg),
+		startTimes:      make(map[int]int64),
+		restartAt:       make(map[string]time.Time),
+		hungSince:       make(map[string]time.Time),
+		manualStop:      make(map[string]bool),
 	}
 	process.SetNetworkConfig(cfg.Settings.UseETWNetwork)
 	process.SetNetworkScale(cfg.Settings.NetScale)
@@ -363,6 +365,7 @@ func (a *App) UpdateConfig(cfg config.Config) {
 	defer a.mu.Unlock()
 	a.cfg = cfg
 	a.last = make(map[string]Status)
+	a.defaultDisabled = buildDefaultDisabledMap(cfg)
 	a.startTimes = make(map[int]int64)
 	a.restartAt = make(map[string]time.Time)
 	a.hungSince = make(map[string]time.Time)
@@ -379,9 +382,8 @@ func (a *App) StartProcess(name string) error {
 	if !ok {
 		return fmt.Errorf("process %q not found", name)
 	}
-	if item.Disabled {
-		return fmt.Errorf("process %q is disabled", name)
-	}
+	// Manual START enables the process so it enters regular monitoring.
+	item.Disabled = false
 	pid, err := runner.Start(item, a.cfg.Settings.LaunchInNewConsole)
 	if err != nil {
 		return err
@@ -399,6 +401,9 @@ func (a *App) StopProcess(name string) error {
 	item, ok := a.cfg.Process[name]
 	if !ok {
 		return fmt.Errorf("process %q not found", name)
+	}
+	if a.defaultDisabled[name] {
+		item.Disabled = true
 	}
 	a.manualStop[name] = true
 	delete(a.restartAt, name)
@@ -547,6 +552,17 @@ func parseCSV(raw string) []string {
 			continue
 		}
 		out = append(out, p)
+	}
+	return out
+}
+
+func buildDefaultDisabledMap(cfg config.Config) map[string]bool {
+	out := make(map[string]bool, len(cfg.Process))
+	for name, item := range cfg.Process {
+		if item == nil {
+			continue
+		}
+		out[name] = item.Disabled
 	}
 	return out
 }
