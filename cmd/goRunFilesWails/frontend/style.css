@@ -41,13 +41,16 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 .head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .title { font-size: 20px; font-weight: 600; letter-spacing: .5px; }
 .meta { color: var(--muted); }
+#version { color: var(--warn); }
 
 .panel { margin-top: 18px; background: var(--panel); border: 1px solid var(--grid); padding: 12px; }
 .panel h2 { margin: 0; font-size: 14px; color: var(--muted); letter-spacing: .4px; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 #toggleConfig { font-size: 16px; padding: 4px 8px; }
 .panel-actions { display: flex; align-items: center; gap: 8px; }
-#restartAll { font-size: 12px; padding: 6px 10px; border: 1px solid var(--grid); background: #0b0f14; }
+.panel-actions__button { font-size: 12px; padding: 6px 10px; border: 1px solid var(--grid); background: #0b0f14; }
+div#configPanel { position: relative; top: 2rem; }
+.config-actions { margin-bottom: 8px; display: flex; position: fixed; z-index: 1; }
 .panel.hidden { display: none; }
 
 table { width: 100%; border-collapse: collapse; }
@@ -90,8 +93,8 @@ button {
   /*border: 1px solid var(--grid);*/
   border: none;
   background: none;
-  padding: 6px 10px;
-  margin-right: 6px;
+  /*padding: 6px 10px;*/
+  margin-right: 2px;
   cursor: pointer;
 }
 /*button:hover { background: #243041; }*/

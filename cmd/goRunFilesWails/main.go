@@ -4,8 +4,8 @@ import (
 	"context"
 	"embed"
 	"log"
-	"os/exec"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -54,7 +54,7 @@ func main() {
 
 	err = wails.Run(&options.App{
 		Title:  "ART3D Process Monitor",
-		Width:  1700,
+		Width:  1800,
 		Height: 900,
 		AssetServer: &assetserver.Options{
 			Assets: assets,

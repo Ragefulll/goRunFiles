@@ -1,6 +1,9 @@
 package process
 
 import (
+	"os/exec"
+	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -93,6 +96,12 @@ func KillPid(pid int) error {
 	if pid <= 0 {
 		return nil
 	}
+	if runtime.GOOS == "windows" {
+		// Kill entire process tree for cmd/bat wrappers (e.g. npm/node children).
+		cmd := exec.Command("taskkill", "/F", "/T", "/PID", strconv.Itoa(pid))
+		hideCmdWindow(cmd)
+		return cmd.Run()
+	}
 	p, err := process.NewProcess(int32(pid))
 	if err != nil {
 		return err
@@ -139,15 +148,11 @@ func ByNameAndCmdlineArgsExact(name, args string) (bool, int, error) {
 			if err != nil {
 				continue
 			}
-			if strings.ToLower(n) != name {
+			if !sameProcessName(n, name) {
 				continue
 			}
 		}
-		cmd, err := p.Cmdline()
-		if err != nil || cmd == "" {
-			continue
-		}
-		tokens := parseCmdlineTokens(cmd)
+		tokens := processMatchTokens(p)
 		if !containsTokenSequence(tokens, needle) {
 			continue
 		}
@@ -187,21 +192,44 @@ func PidsByNameAndCmdlineArgsExact(name, args string) ([]int, error) {
 			if err != nil {
 				continue
 			}
-			if strings.ToLower(n) != name {
+			if !sameProcessName(n, name) {
 				continue
 			}
 		}
-		cmd, err := p.Cmdline()
-		if err != nil || cmd == "" {
-			continue
-		}
-		tokens := parseCmdlineTokens(cmd)
+		tokens := processMatchTokens(p)
 		if !containsTokenSequence(tokens, needle) {
 			continue
 		}
 		out = append(out, int(p.Pid))
 	}
 	return out, nil
+}
+
+func processMatchTokens(p *process.Process) []string {
+	out := make([]string, 0, 32)
+	if cmd, err := p.Cmdline(); err == nil && cmd != "" {
+		out = append(out, parseCmdlineTokens(cmd)...)
+	}
+	// npm/node workflows often keep project path in cwd (not in cmdline).
+	if cwd, err := p.Cwd(); err == nil && cwd != "" {
+		out = append(out, parseCmdlineTokens(cwd)...)
+	}
+	return out
+}
+
+func sameProcessName(actual, expected string) bool {
+	a := strings.ToLower(strings.TrimSpace(actual))
+	e := strings.ToLower(strings.TrimSpace(expected))
+	if a == "" || e == "" {
+		return a == e
+	}
+	if a == e {
+		return true
+	}
+	if strings.TrimSuffix(a, ".exe") == strings.TrimSuffix(e, ".exe") {
+		return true
+	}
+	return false
 }
 
 // KillByNameAndCmdlineArgsExact terminates all matching processes.

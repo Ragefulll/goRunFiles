@@ -676,7 +676,11 @@ func stopProcessItem(item *config.ProcessItem) error {
 		return nil
 	case config.TypeCmd, config.TypeBat:
 		if strings.TrimSpace(item.CheckCmdline) != "" {
-			return process.KillByNameAndCmdlineArgsExact(item.CheckProcess, item.CheckCmdline)
+			if err := process.KillByNameAndCmdlineArgsExact(item.CheckProcess, item.CheckCmdline); err != nil {
+				return err
+			}
+			item.Pid = 0
+			return nil
 		}
 		if strings.TrimSpace(item.CheckProcess) != "" {
 			names := parseProcessList("", item.CheckProcess)

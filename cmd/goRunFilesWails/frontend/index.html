@@ -10,18 +10,18 @@
     <div class="wrap">
       <header class="head">
         <div class="title">ART3D Process Monitor</div>
-        <div class="meta">Updated: <span id="updated">—</span></div>
         <div class="meta">Version: <span id="version">—</span></div>
+        <div class="meta">Updated: <span id="updated">—</span></div>
       </header>
 
       <section class="panel">
         <div class="panel-head">
           <h2>Processes</h2>
           <div class="panel-actions">
-            <button id="restartAll" title="Restart all" aria-label="Restart all">Restart All</button>
-            <button id="killCMD" title="Kill all cmd.exe" aria-label="Kill all cmd.exe">Kill CMD</button>
-            <button id="killNode" title="Kill all node.exe" aria-label="Kill all node.exe">Kill Node</button>
-            <button id="toggleConfig" title="Настройки" aria-label="Настройки">⚙</button>
+            <button class="panel-actions__button" id="restartAll" title="Restart all" aria-label="Restart all">Restart All</button>
+            <button class="panel-actions__button" id="killCMD" title="Kill all cmd.exe" aria-label="Kill all cmd.exe">Kill CMD</button>
+            <button class="panel-actions__button" id="killNode" title="Kill all node.exe" aria-label="Kill all node.exe">Kill Node</button>
+            <button class="panel-actions__button" id="toggleConfig" title="Настройки" aria-label="Настройки">⚙</button>
           </div>
         </div>
         <table>
@@ -63,9 +63,9 @@
           <button id="closeConfig" title="Закрыть">✕</button>
         </div>
         <div class="config-actions">
-          <button id="reloadConfig">Reload</button>
-          <button id="saveConfig">Save</button>
-          <button id="addProcess">Add process</button>
+          <button class="panel-actions__button fixed" id="reloadConfig">Reload</button>
+          <button class="panel-actions__button fixed" id="saveConfig">Save</button>
+          <button class="panel-actions__button fixed" id="addProcess">Add process</button>
         </div>
         <div id="configPanel" class="config-panel">
           <div class="config-grid">
