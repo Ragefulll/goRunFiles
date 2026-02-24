@@ -149,6 +149,15 @@ func (g *GUI) KillNode() error {
 	return killImage("node.exe")
 }
 
+// OpenFolder opens configured process path in system file explorer.
+func (g *GUI) OpenFolder(name string) error {
+	path, err := g.mon.GetProcessPath(name)
+	if err != nil {
+		return err
+	}
+	return openFolder(path)
+}
+
 func killImage(imageName string) error {
 	if runtime.GOOS != "windows" {
 		return nil
@@ -157,6 +166,16 @@ func killImage(imageName string) error {
 	// Ignore "not found" cases (exit code 128) so button is idempotent.
 	cmd := exec.Command("cmd", "/C", "taskkill /F /IM "+imageName+" >nul 2>&1 || exit /b 0")
 	return cmd.Run()
+}
+
+func openFolder(path string) error {
+	if runtime.GOOS == "windows" {
+		return exec.Command("explorer", path).Start()
+	}
+	if runtime.GOOS == "darwin" {
+		return exec.Command("open", path).Start()
+	}
+	return exec.Command("xdg-open", path).Start()
 }
 
 // GetConfig returns the current config.ini content.

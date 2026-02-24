@@ -443,6 +443,21 @@ func (a *App) RestartAll() error {
 	return lastErr
 }
 
+// GetProcessPath returns configured working path for process by config name.
+func (a *App) GetProcessPath(name string) (string, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	item, ok := a.cfg.Process[name]
+	if !ok {
+		return "", fmt.Errorf("process %q not found", name)
+	}
+	path := strings.TrimSpace(item.Path)
+	if path == "" {
+		return "", fmt.Errorf("process %q has empty path", name)
+	}
+	return path, nil
+}
+
 // StopAll stops all configured processes (including disabled).
 func (a *App) StopAll() error {
 	a.mu.Lock()

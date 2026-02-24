@@ -147,6 +147,7 @@ const render = (data) => {
       <td>${it.target || ""}</td>
       <td>${it.error || ""}</td>
       <td>
+        <button data-action="open-folder" data-name="${it.name}" title="Open folder">📁</button>
         <button data-action="start" data-name="${it.name}">▶️</button>
         <button data-action="stop" data-name="${it.name}">❌</button>
         <button data-action="restart" data-name="${it.name}">🔄️</button>
@@ -171,6 +172,7 @@ tbody.addEventListener("click", async (e) => {
   const name = btn.dataset.name;
   const action = btn.dataset.action;
   try {
+    if (action === "open-folder") await api.OpenFolder(name);
     if (action === "start") await api.Start(name);
     if (action === "stop") await api.Stop(name);
     if (action === "restart") await api.Restart(name);
