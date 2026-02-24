@@ -8,6 +8,10 @@ $env:Path = "C:\msys64\ucrt64\bin;$env:Path"
 gcc --version
 ```
 
+```
+go run github.com/Velocidex/etw/examples/tracer@latest -events network -kernel_event_type_filter "Send|Recv|TCP|UDP" "{9E814AAD-3204-11D2-9A82-006008A86939}"
+```
+
 Перед go run:
 ```.\run.ps1```
 
