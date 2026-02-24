@@ -30,6 +30,7 @@ type SettingsDTO struct {
 	AutoCloseErrorDialogs bool   `json:"autoCloseErrorDialogs"`
 	ErrorWindowTitles     string `json:"errorWindowTitles"`
 	UseETWNetwork         bool   `json:"useETWNetwork"`
+	NetDebug              bool   `json:"netDebug"`
 	NetUnit               string `json:"netUnit"`
 	NetScale              string `json:"netScale"`
 }
@@ -57,6 +58,7 @@ func ToDTO(cfg Config) ConfigDTO {
 			AutoCloseErrorDialogs: cfg.Settings.AutoCloseErrorDialogs,
 			ErrorWindowTitles:     cfg.Settings.ErrorWindowTitles,
 			UseETWNetwork:         cfg.Settings.UseETWNetwork,
+			NetDebug:              cfg.Settings.NetDebug,
 			NetUnit:               cfg.Settings.NetUnit,
 			NetScale:              floatToString(cfg.Settings.NetScale),
 		},
@@ -102,6 +104,7 @@ func FromDTO(dto ConfigDTO) (Config, error) {
 	cfg.Settings.AutoCloseErrorDialogs = dto.Settings.AutoCloseErrorDialogs
 	cfg.Settings.ErrorWindowTitles = dto.Settings.ErrorWindowTitles
 	cfg.Settings.UseETWNetwork = dto.Settings.UseETWNetwork
+	cfg.Settings.NetDebug = dto.Settings.NetDebug
 	cfg.Settings.NetUnit = strings.TrimSpace(dto.Settings.NetUnit)
 	cfg.Settings.NetScale = parseFloatOrZero(dto.Settings.NetScale)
 

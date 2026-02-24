@@ -12,6 +12,8 @@
         <div class="title">ART3D Process Monitor</div>
         <div class="meta">Version: <span id="version">—</span></div>
         <div class="meta">Updated: <span id="updated">—</span></div>
+        <div class="meta">Net: <span id="netStatus">—</span></div>
+        <div class="meta">Net Debug: <span id="netDebug">—</span></div>
       </header>
 
       <section class="panel">
@@ -28,7 +30,7 @@
           <thead>
             <tr>
               <th>NAME</th><th>TYPE</th><th>STATUS</th><th>PID</th>
-              <th>STARTED</th><th>UPTIME</th><th>CPU</th><th>GPU</th><th>RAM</th><th>NET</th><th>TARGET</th><th>ERROR</th><th>ACTIONS</th>
+              <th>STARTED</th><th>UPTIME</th><th>CPU</th><th>GPU</th><th>RAM</th><th>NET</th><th>IO</th><th>TARGET</th><th>ERROR</th><th>ACTIONS</th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>
@@ -77,6 +79,9 @@
             </label>
             <label>Use ETW network
               <input id="cfgUseETWNetwork" type="checkbox" />
+            </label>
+            <label>Net debug
+              <input id="cfgNetDebug" type="checkbox" />
             </label>
             <label>Net unit
               <select id="cfgNetUnit">

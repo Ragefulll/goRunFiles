@@ -40,6 +40,7 @@ type Settings struct {
 	AutoCloseErrorDialogs bool
 	ErrorWindowTitles     string
 	UseETWNetwork         bool
+	NetDebug              bool
 	NetUnit               string
 	NetScale              float64
 }

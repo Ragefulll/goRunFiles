@@ -21,7 +21,7 @@ func ByName(name string) (bool, int, error) {
 		if err != nil {
 			continue
 		}
-		if n == name {
+		if sameProcessName(n, name) {
 			return true, int(p.Pid), nil
 		}
 	}
@@ -40,7 +40,7 @@ func PidsByName(name string) ([]int, error) {
 		if err != nil {
 			continue
 		}
-		if n == name {
+		if sameProcessName(n, name) {
 			out = append(out, int(p.Pid))
 		}
 	}
@@ -218,8 +218,8 @@ func processMatchTokens(p *process.Process) []string {
 }
 
 func sameProcessName(actual, expected string) bool {
-	a := strings.ToLower(strings.TrimSpace(actual))
-	e := strings.ToLower(strings.TrimSpace(expected))
+	a := normalizeProcessName(actual)
+	e := normalizeProcessName(expected)
 	if a == "" || e == "" {
 		return a == e
 	}
@@ -230,6 +230,12 @@ func sameProcessName(actual, expected string) bool {
 		return true
 	}
 	return false
+}
+
+func normalizeProcessName(name string) string {
+	n := strings.ToLower(strings.TrimSpace(name))
+	n = strings.Trim(n, "\"'")
+	return n
 }
 
 // KillByNameAndCmdlineArgsExact terminates all matching processes.

@@ -65,6 +65,7 @@ func WriteFromDTO(path string, dto ConfigDTO) error {
 	b.WriteString(fmt.Sprintf("launchInNewConsole=%v\n", dto.Settings.LaunchInNewConsole))
 	b.WriteString(fmt.Sprintf("autoCloseErrorDialogs=%v\n", dto.Settings.AutoCloseErrorDialogs))
 	b.WriteString(fmt.Sprintf("useETWNetwork=%v\n", dto.Settings.UseETWNetwork))
+	b.WriteString(fmt.Sprintf("netDebug=%v\n", dto.Settings.NetDebug))
 	if strings.TrimSpace(dto.Settings.NetUnit) != "" {
 		b.WriteString(fmt.Sprintf("netUnit=%s\n", dto.Settings.NetUnit))
 	}

@@ -50,7 +50,9 @@ func New(cfg config.Config, logger *log.Logger, version string) *App {
 		hungSince:       make(map[string]time.Time),
 		manualStop:      make(map[string]bool),
 	}
-	process.SetNetworkConfig(cfg.Settings.UseETWNetwork)
+	if err := process.SetNetworkConfig(cfg.Settings.UseETWNetwork); err != nil {
+		logger.Printf("%s ETW network disabled: %v", LogTag, err)
+	}
 	process.SetNetworkScale(cfg.Settings.NetScale)
 	return app
 }
@@ -107,7 +109,11 @@ func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot
 
 	now := time.Now()
 	statuses := a.computeStatuses(true, now)
-	onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.NetUnit))
+	netDbg := ""
+	if a.cfg.Settings.NetDebug {
+		netDbg = process.NetDebug()
+	}
+	onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg))
 
 	checkTicker := time.NewTicker(a.cfg.Settings.CheckTiming.Duration)
 	defer checkTicker.Stop()
@@ -122,11 +128,19 @@ func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot
 		case <-checkTicker.C:
 			now := time.Now()
 			statuses := a.computeStatuses(false, now)
-			onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.NetUnit))
+			netDbg := ""
+			if a.cfg.Settings.NetDebug {
+				netDbg = process.NetDebug()
+			}
+			onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg))
 		case <-restartTicker.C:
 			now := time.Now()
 			statuses := a.computeStatuses(true, now)
-			onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.NetUnit))
+			netDbg := ""
+			if a.cfg.Settings.NetDebug {
+				netDbg = process.NetDebug()
+			}
+			onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg))
 		}
 	}
 }
@@ -301,7 +315,26 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			if metricsPid > 0 {
 				status.Cpu = process.CPUPercent(metricsPid)
 				status.MemMB = process.MemoryMB(metricsPid)
-				status.NetKBs = process.NetKBs(metricsPid)
+				if status.Type == config.TypeExe && len(namesToCheck) > 0 {
+					netByNames := process.NetKBsByNames(namesToCheck)
+					netByPID := process.NetKBs(metricsPid)
+					if netByNames > netByPID {
+						status.NetKBs = netByNames
+					} else {
+						status.NetKBs = netByPID
+					}
+
+					ioByNames := process.IOKBsByNames(namesToCheck)
+					ioByPID := process.IOKBs(metricsPid)
+					if ioByNames > ioByPID {
+						status.IOKBs = ioByNames
+					} else {
+						status.IOKBs = ioByPID
+					}
+				} else {
+					status.NetKBs = process.NetKBs(metricsPid)
+					status.IOKBs = process.IOKBs(metricsPid)
+				}
 				if gpu, ok := gpuByPid[metricsPid]; ok {
 					status.Gpu = gpu.Util
 					status.GpuMemMB = gpu.MemMB
@@ -370,7 +403,9 @@ func (a *App) UpdateConfig(cfg config.Config) {
 	a.restartAt = make(map[string]time.Time)
 	a.hungSince = make(map[string]time.Time)
 	a.manualStop = make(map[string]bool)
-	process.SetNetworkConfig(cfg.Settings.UseETWNetwork)
+	if err := process.SetNetworkConfig(cfg.Settings.UseETWNetwork); err != nil {
+		a.logger.Printf("%s ETW network disabled: %v", LogTag, err)
+	}
 	process.SetNetworkScale(cfg.Settings.NetScale)
 }
 
@@ -496,6 +531,7 @@ type procStatus struct {
 	GpuMemMB  int
 	MemMB     int
 	NetKBs    float64
+	IOKBs     float64
 	Err       string
 }
 

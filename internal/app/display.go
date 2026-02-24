@@ -23,6 +23,7 @@ type DisplayStatus struct {
 	GpuMemMB  string `json:"gpu_mem_mb"`
 	MemMB     string `json:"mem_mb"`
 	NetKBs    string `json:"net_kbs"`
+	IOKBs     string `json:"io_kbs"`
 }
 
 // DisplaySnapshot is a UI-friendly snapshot of the current system state.
@@ -30,10 +31,13 @@ type DisplaySnapshot struct {
 	Updated string          `json:"updated"`
 	Version string          `json:"version"`
 	NetUnit string          `json:"net_unit"`
+	NetMode string          `json:"net_mode"`
+	NetErr  string          `json:"net_err"`
+	NetDbg  string          `json:"net_dbg"`
 	Items   []DisplayStatus `json:"items"`
 }
 
-func buildDisplaySnapshot(version string, statuses []procStatus, now time.Time, netUnit string) DisplaySnapshot {
+func buildDisplaySnapshot(version string, statuses []procStatus, now time.Time, netUnit, netMode, netErr, netDbg string) DisplaySnapshot {
 	if strings.TrimSpace(netUnit) == "" {
 		netUnit = "KB"
 	}
@@ -55,12 +59,16 @@ func buildDisplaySnapshot(version string, statuses []procStatus, now time.Time, 
 			GpuMemMB:  formatMemMB(s.GpuMemMB),
 			MemMB:     formatMemMB(s.MemMB),
 			NetKBs:    formatRate(s.NetKBs, netUnit),
+			IOKBs:     formatRate(s.IOKBs, netUnit),
 		})
 	}
 	return DisplaySnapshot{
 		Updated: now.Format("2006-01-02 15:04:05"),
 		Version: version,
 		NetUnit: netUnit,
+		NetMode: netMode,
+		NetErr:  netErr,
+		NetDbg:  netDbg,
 		Items:   items,
 	}
 }
