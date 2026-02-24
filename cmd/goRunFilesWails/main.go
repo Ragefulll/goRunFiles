@@ -4,8 +4,10 @@ import (
 	"context"
 	"embed"
 	"log"
+	"os/exec"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 
 	"goRunFiles/internal/app"
@@ -52,7 +54,7 @@ func main() {
 
 	err = wails.Run(&options.App{
 		Title:  "ART3D Process Monitor",
-		Width:  1600,
+		Width:  1700,
 		Height: 900,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
@@ -135,6 +137,26 @@ func (g *GUI) Restart(name string) error {
 // RestartAll restarts all enabled processes.
 func (g *GUI) RestartAll() error {
 	return g.mon.RestartAll()
+}
+
+// KillCMD force-kills all cmd.exe processes.
+func (g *GUI) KillCMD() error {
+	return killImage("cmd.exe")
+}
+
+// KillNode force-kills all node.exe processes.
+func (g *GUI) KillNode() error {
+	return killImage("node.exe")
+}
+
+func killImage(imageName string) error {
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+
+	// Ignore "not found" cases (exit code 128) so button is idempotent.
+	cmd := exec.Command("cmd", "/C", "taskkill /F /IM "+imageName+" >nul 2>&1 || exit /b 0")
+	return cmd.Run()
 }
 
 // GetConfig returns the current config.ini content.

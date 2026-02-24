@@ -7,6 +7,8 @@ const reloadBtn = document.getElementById("reloadConfig");
 const saveBtn = document.getElementById("saveConfig");
 const toggleBtn = document.getElementById("toggleConfig");
 const restartAllBtn = document.getElementById("restartAll");
+const killCMDBtn = document.getElementById("killCMD");
+const killNodeBtn = document.getElementById("killNode");
 const addProcessBtn = document.getElementById("addProcess");
 const configPanel = document.getElementById("configPanel");
 const configPassword = document.getElementById("configPassword");
@@ -181,6 +183,24 @@ restartAllBtn.addEventListener("click", async () => {
   if (!api) return;
   try {
     await api.RestartAll();
+  } catch (err) {
+    console.error(err);
+  }
+});
+
+killCMDBtn.addEventListener("click", async () => {
+  if (!api) return;
+  try {
+    await api.KillCMD();
+  } catch (err) {
+    console.error(err);
+  }
+});
+
+killNodeBtn.addEventListener("click", async () => {
+  if (!api) return;
+  try {
+    await api.KillNode();
   } catch (err) {
     console.error(err);
   }
