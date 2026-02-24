@@ -236,9 +236,6 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 				status.Err = pathErr
 			}
 			checkCmdline := strings.TrimSpace(item.CheckCmdline)
-			if checkCmdline == "" {
-				checkCmdline = item.Process
-			}
 			if checkCmdline != "" {
 				ok, pid, err := process.ByNameAndCmdlineArgsExact(item.CheckProcess, checkCmdline)
 				if err != nil {
@@ -262,6 +259,15 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 						}
 						break
 					}
+				}
+			} else if strings.TrimSpace(item.Process) != "" {
+				ok, pid, err := process.ByNameAndCmdlineArgsExact("", item.Process)
+				if err != nil {
+					status.Err = err.Error()
+				}
+				alive = ok
+				if pid > 0 {
+					item.Pid = pid
 				}
 			} else if item.Pid > 0 {
 				alive = process.IsPidAlive(item.Pid)
