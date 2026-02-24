@@ -298,7 +298,15 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 
 		if alive {
 			if a.manualStop[name] {
-				delete(a.manualStop, name)
+				// Manual STOP must win even if process is relaunched externally.
+				_ = stopProcessItem(item)
+				status.Status = StatusStopped
+				a.last[name] = StatusStopped
+				status.Uptime = "-"
+				status.StartedAt = "-"
+				delete(a.restartAt, name)
+				statuses = append(statuses, status)
+				continue
 			}
 			if a.last[name] == StatusStarted {
 				status.Status = StatusStarted
@@ -741,12 +749,19 @@ func validatePath(dir, name string) string {
 func stopProcessItem(item *config.ProcessItem) error {
 	switch item.Type {
 	case config.TypeExe:
+		var lastErr error
+		// Prefer killing the tracked root pid first (tree kill on Windows).
+		if item.Pid > 0 {
+			if err := process.KillPid(item.Pid); err != nil {
+				lastErr = err
+			}
+		}
 		names := parseProcessList(item.Process, item.CheckProcess)
 		if err := process.KillByNames(names); err != nil {
-			return err
+			lastErr = err
 		}
 		item.Pid = 0
-		return nil
+		return lastErr
 	case config.TypeCmd, config.TypeBat:
 		if strings.TrimSpace(item.CheckCmdline) != "" {
 			if err := process.KillByNameAndCmdlineArgsExact(item.CheckProcess, item.CheckCmdline); err != nil {

@@ -65,11 +65,7 @@ func KillByName(name string) error {
 	}
 	var lastErr error
 	for _, pid := range pids {
-		p, err := process.NewProcess(int32(pid))
-		if err != nil {
-			continue
-		}
-		if err := p.Terminate(); err != nil {
+		if err := KillPid(pid); err != nil {
 			lastErr = err
 		}
 	}
