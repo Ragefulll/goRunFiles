@@ -164,6 +164,22 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 	sort.Strings(names)
 
 	gpuByPid := process.GpuStatsByPid()
+	type metricTask struct {
+		idx   int
+		typ   string
+		pid   int
+		names []string
+	}
+	type metricResult struct {
+		idx    int
+		cpu    float64
+		memMB  int
+		netKBs float64
+		ioKBs  float64
+		gpu    float64
+		gpuMem int
+	}
+	metricTasks := make([]metricTask, 0, len(names))
 
 	for _, name := range names {
 		item := a.cfg.Process[name]
@@ -321,32 +337,13 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 				metricsPid = preferShippingPid(namesToCheck, status.Pid)
 			}
 			if metricsPid > 0 {
-				status.Cpu = process.CPUPercent(metricsPid)
-				status.MemMB = process.MemoryMB(metricsPid)
-				if status.Type == config.TypeExe && len(namesToCheck) > 0 {
-					netByNames := process.NetKBsByNames(namesToCheck)
-					netByPID := process.NetKBs(metricsPid)
-					if netByNames > netByPID {
-						status.NetKBs = netByNames
-					} else {
-						status.NetKBs = netByPID
-					}
-
-					ioByNames := process.IOKBsByNames(namesToCheck)
-					ioByPID := process.IOKBs(metricsPid)
-					if ioByNames > ioByPID {
-						status.IOKBs = ioByNames
-					} else {
-						status.IOKBs = ioByPID
-					}
-				} else {
-					status.NetKBs = process.NetKBs(metricsPid)
-					status.IOKBs = process.IOKBs(metricsPid)
-				}
-				if gpu, ok := gpuByPid[metricsPid]; ok {
-					status.Gpu = gpu.Util
-					status.GpuMemMB = gpu.MemMB
-				}
+				namesCopy := append([]string(nil), namesToCheck...)
+				metricTasks = append(metricTasks, metricTask{
+					idx:   len(statuses),
+					typ:   status.Type,
+					pid:   metricsPid,
+					names: namesCopy,
+				})
 			}
 			a.fillTimes(&status, now)
 			delete(a.restartAt, name)
@@ -395,6 +392,70 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 		}
 
 		statuses = append(statuses, status)
+	}
+
+	if len(metricTasks) > 0 {
+		const maxMetricWorkers = 4
+		sem := make(chan struct{}, maxMetricWorkers)
+		results := make(chan metricResult, len(metricTasks))
+		var wg sync.WaitGroup
+
+		for _, task := range metricTasks {
+			task := task
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+
+				res := metricResult{
+					idx:   task.idx,
+					cpu:   process.CPUPercent(task.pid),
+					memMB: process.MemoryMB(task.pid),
+				}
+
+				if task.typ == config.TypeExe && len(task.names) > 0 {
+					netByNames := process.NetKBsByNames(task.names)
+					netByPID := process.NetKBs(task.pid)
+					if netByNames > netByPID {
+						res.netKBs = netByNames
+					} else {
+						res.netKBs = netByPID
+					}
+
+					ioByNames := process.IOKBsByNames(task.names)
+					ioByPID := process.IOKBs(task.pid)
+					if ioByNames > ioByPID {
+						res.ioKBs = ioByNames
+					} else {
+						res.ioKBs = ioByPID
+					}
+				} else {
+					res.netKBs = process.NetKBs(task.pid)
+					res.ioKBs = process.IOKBs(task.pid)
+				}
+
+				if gpu, ok := gpuByPid[task.pid]; ok {
+					res.gpu = gpu.Util
+					res.gpuMem = gpu.MemMB
+				}
+				results <- res
+			}()
+		}
+
+		wg.Wait()
+		close(results)
+		for res := range results {
+			if res.idx < 0 || res.idx >= len(statuses) {
+				continue
+			}
+			statuses[res.idx].Cpu = res.cpu
+			statuses[res.idx].MemMB = res.memMB
+			statuses[res.idx].NetKBs = res.netKBs
+			statuses[res.idx].IOKBs = res.ioKBs
+			statuses[res.idx].Gpu = res.gpu
+			statuses[res.idx].GpuMemMB = res.gpuMem
+		}
 	}
 
 	return statuses
