@@ -142,6 +142,7 @@ const render = (data) => {
     const tr = document.createElement("tr");
     if (it.hung) tr.classList.add("hung");
     if (it.status === "disabled") tr.classList.add("row-disabled");
+    const canStart = it.status !== "running" && it.status !== "started";
 
     const cpuVal = parseFloat(it.cpu || "0") || 0;
     const gpuVal = parseFloat(it.gpu || "0") || 0;
@@ -211,7 +212,7 @@ const render = (data) => {
       <td>${it.error || ""}</td>
       <td>
         <button data-action="open-folder" data-name="${it.name}" title="Open folder">📁</button>
-        <button data-action="start" data-name="${it.name}">▶️</button>
+        <button data-action="start" data-name="${it.name}" ${canStart ? "" : "disabled"}>▶️</button>
         <button data-action="stop" data-name="${it.name}">❌</button>
         <button data-action="restart" data-name="${it.name}">🔄️</button>
       </td>

@@ -486,9 +486,25 @@ func (a *App) StartProcess(name string) error {
 	if !ok {
 		return fmt.Errorf("process %q not found", name)
 	}
+	alive, pid, err := isProcessItemAlive(item)
+	if err != nil {
+		return err
+	}
+	if alive {
+		if pid > 0 {
+			item.Pid = pid
+		}
+		// Keep state in sync when process is already running.
+		item.Disabled = false
+		delete(a.manualStop, name)
+		delete(a.restartAt, name)
+		delete(a.hungSince, name)
+		a.last[name] = StatusRunning
+		return fmt.Errorf("process %q is already running", name)
+	}
 	// Manual START enables the process so it enters regular monitoring.
 	item.Disabled = false
-	pid, err := runner.Start(item, a.cfg.Settings.LaunchInNewConsole)
+	pid, err = runner.Start(item, a.cfg.Settings.LaunchInNewConsole)
 	if err != nil {
 		return err
 	}
@@ -874,5 +890,57 @@ func stopProcessItem(item *config.ProcessItem) error {
 		return nil
 	default:
 		return fmt.Errorf("unknown type %q", item.Type)
+	}
+}
+
+func isProcessItemAlive(item *config.ProcessItem) (bool, int, error) {
+	switch item.Type {
+	case config.TypeExe:
+		names := parseProcessList(item.Process, item.CheckProcess)
+		var lastErr error
+		for _, procName := range names {
+			ok, pid, err := process.ByName(procName)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			if ok {
+				return true, pid, nil
+			}
+		}
+		return false, 0, lastErr
+	case config.TypeCmd, config.TypeBat:
+		if strings.TrimSpace(item.CheckCmdline) != "" {
+			ok, pid, err := process.ByNameAndCmdlineArgsExact(item.CheckProcess, item.CheckCmdline)
+			if err != nil {
+				return false, 0, err
+			}
+			if ok {
+				return true, pid, nil
+			}
+		}
+		if strings.TrimSpace(item.CheckProcess) != "" {
+			names := parseProcessList("", item.CheckProcess)
+			var lastErr error
+			for _, procName := range names {
+				ok, pid, err := process.ByName(procName)
+				if err != nil {
+					lastErr = err
+					continue
+				}
+				if ok {
+					return true, pid, nil
+				}
+			}
+			if lastErr != nil {
+				return false, 0, lastErr
+			}
+		}
+		if item.Pid > 0 && process.IsPidAlive(item.Pid) {
+			return true, item.Pid, nil
+		}
+		return false, 0, nil
+	default:
+		return false, 0, fmt.Errorf("unknown type %q", item.Type)
 	}
 }

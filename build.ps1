@@ -8,6 +8,20 @@ $ErrorActionPreference = "Stop"
 function Enable-CgoIfWindows {
   if (-not $IsWindows) { return }
   $env:CGO_ENABLED = "1"
+  if (-not (Get-Command gcc -ErrorAction SilentlyContinue)) {
+    $gccDirs = @(
+      "C:\msys64\ucrt64\bin",
+      "C:\msys64\mingw64\bin",
+      "C:\mingw64\bin",
+      "C:\Program Files\mingw-w64\mingw64\bin"
+    )
+    foreach ($dir in $gccDirs) {
+      if (Test-Path (Join-Path $dir "gcc.exe")) {
+        $env:PATH = "$dir;$env:PATH"
+        break
+      }
+    }
+  }
   try {
     $null = & gcc --version 2>$null
   } catch {
