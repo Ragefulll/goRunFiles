@@ -167,6 +167,9 @@ const render = (data) => {
       ? `<span class="anim-number anim-pid">${Math.round(pidNum)}</span>`
       : "-";
 
+    const netDisplay = netIsMB ? netVal.toFixed(2) : netVal.toFixed(0);
+    const ioDisplay = netIsMB ? ioVal.toFixed(2) : ioVal.toFixed(0);
+
     tr.innerHTML = `
       <td>${it.name || ""}</td>
       <td>${it.type || ""}</td>
@@ -186,21 +189,21 @@ const render = (data) => {
           ${gpuSpark}
         </div>
       </td>
-      <td class="metric" title="RAM: ${memVal.toFixed(0)} MB">
+      <td class="metric" title="RAM: ${memVal.toFixed(2)} MB">
         <div class="metric-wrap">
-          <span class="metric-val anim-number anim-ram">${memVal.toFixed(0)}MB</span>
+          <span class="metric-val anim-number anim-ram">${memVal.toFixed(2)}MB</span>
           ${memSpark}
         </div>
       </td>
       <td class="metric" title="NET: ${netKBVal.toFixed(1)} KB/s | ${netMBVal.toFixed(2)} MB/s">
         <div class="metric-wrap">
-          <span class="metric-val anim-number anim-net">${netVal.toFixed(0)}${netUnit}</span>
+          <span class="metric-val anim-number anim-net">${netDisplay}${netUnit}</span>
           ${netSpark}
         </div>
       </td>
       <td class="metric" title="IO: ${ioKBVal.toFixed(1)} KB/s | ${ioMBVal.toFixed(2)} MB/s">
         <div class="metric-wrap">
-          <span class="metric-val anim-number anim-io">${ioVal.toFixed(0)}${netUnit}</span>
+          <span class="metric-val anim-number anim-io">${ioDisplay}${netUnit}</span>
           ${ioSpark}
         </div>
       </td>
@@ -247,19 +250,23 @@ const render = (data) => {
       tr.querySelector(".anim-ram"),
       toFiniteOr(prevMem, memVal),
       memVal,
-      (v) => `${Math.max(0, Math.round(v))}MB`
+      (v) => `${Math.max(0, v).toFixed(2)}MB`
     );
     animateNumber(
       tr.querySelector(".anim-net"),
       toFiniteOr(prevNet, netVal),
       netVal,
-      (v) => `${Math.max(0, Math.round(v))}${netUnit}`
+      (v) => netIsMB
+        ? `${Math.max(0, v).toFixed(2)}${netUnit}`
+        : `${Math.max(0, Math.round(v))}${netUnit}`
     );
     animateNumber(
       tr.querySelector(".anim-io"),
       toFiniteOr(prevIo, ioVal),
       ioVal,
-      (v) => `${Math.max(0, Math.round(v))}${netUnit}`
+      (v) => netIsMB
+        ? `${Math.max(0, v).toFixed(2)}${netUnit}`
+        : `${Math.max(0, Math.round(v))}${netUnit}`
     );
   }
 
