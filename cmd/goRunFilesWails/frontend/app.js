@@ -36,6 +36,7 @@ let lastSnapshot = null;
 const HISTORY_LEN = 40;
 const metricHistory = new Map();
 let sparkSeq = 0;
+const ANIM_DURATION_MS = 320;
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
@@ -81,6 +82,36 @@ const buildSparkline = (values, color) => {
       <polyline points="${poly}" fill="none" stroke="${color}" stroke-width="2" />
     </svg>
   `;
+};
+
+const toFiniteOr = (v, fallback) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+const animateNumber = (el, from, to, format, duration = ANIM_DURATION_MS) => {
+  if (!el) return;
+  const start = performance.now();
+  const fromVal = toFiniteOr(from, toFiniteOr(to, 0));
+  const toVal = toFiniteOr(to, fromVal);
+  const delta = toVal - fromVal;
+
+  if (!Number.isFinite(fromVal) || !Number.isFinite(toVal) || Math.abs(delta) < 0.0001) {
+    el.textContent = format(toVal);
+    return;
+  }
+
+  const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+  const step = (now) => {
+    const p = Math.min(1, (now - start) / duration);
+    const eased = easeOutCubic(p);
+    const value = fromVal + delta * eased;
+    el.textContent = format(value);
+    if (p < 1) {
+      requestAnimationFrame(step);
+    }
+  };
+  requestAnimationFrame(step);
 };
 
 const render = (data) => {
@@ -131,40 +162,45 @@ const render = (data) => {
     const netSpark = buildSparkline(hist.net, "#c4b5fd");
     const ioSpark = buildSparkline(hist.io, "#f9d46b");
 
+    const pidNum = Number(it.pid);
+    const pidText = Number.isFinite(pidNum) && pidNum > 0
+      ? `<span class="anim-number anim-pid">${Math.round(pidNum)}</span>`
+      : "-";
+
     tr.innerHTML = `
       <td>${it.name || ""}</td>
       <td>${it.type || ""}</td>
       <td class="status ${it.status || ""}">${it.icon || ""}</td>
-      <td>${it.pid || "-"}</td>
+      <td>${pidText}</td>
       <td>${it.started_at || "-"}</td>
       <td>${it.uptime || "-"}</td>
       <td class="metric">
         <div class="metric-wrap">
-          <span class="metric-val">${cpuVal.toFixed(0)}%</span>
+          <span class="metric-val anim-number anim-cpu">${cpuVal.toFixed(0)}%</span>
           ${cpuSpark}
         </div>
       </td>
       <td class="metric" title="GPU memory: ${it.gpu_mem_mb || 0} MB">
         <div class="metric-wrap">
-          <span class="metric-val">${gpuVal.toFixed(0)}%</span>
+          <span class="metric-val anim-number anim-gpu">${gpuVal.toFixed(0)}%</span>
           ${gpuSpark}
         </div>
       </td>
       <td class="metric" title="RAM: ${memVal.toFixed(0)} MB">
         <div class="metric-wrap">
-          <span class="metric-val">${memVal.toFixed(0)}MB</span>
+          <span class="metric-val anim-number anim-ram">${memVal.toFixed(0)}MB</span>
           ${memSpark}
         </div>
       </td>
       <td class="metric" title="NET: ${netKBVal.toFixed(1)} KB/s | ${netMBVal.toFixed(2)} MB/s">
         <div class="metric-wrap">
-          <span class="metric-val">${netVal.toFixed(0)}${netUnit}</span>
+          <span class="metric-val anim-number anim-net">${netVal.toFixed(0)}${netUnit}</span>
           ${netSpark}
         </div>
       </td>
       <td class="metric" title="IO: ${ioKBVal.toFixed(1)} KB/s | ${ioMBVal.toFixed(2)} MB/s">
         <div class="metric-wrap">
-          <span class="metric-val">${ioVal.toFixed(0)}${netUnit}</span>
+          <span class="metric-val anim-number anim-io">${ioVal.toFixed(0)}${netUnit}</span>
           ${ioSpark}
         </div>
       </td>
@@ -177,8 +213,54 @@ const render = (data) => {
         <button data-action="restart" data-name="${it.name}">🔄️</button>
       </td>
     `;
-    // no per-cell animations
     tbody.appendChild(tr);
+
+    const prevPid = Number(prev.pid);
+    const prevCpu = parseFloat(prev.cpu || "0");
+    const prevGpu = parseFloat(prev.gpu || "0");
+    const prevMem = parseFloat(prev.mem_mb || "0");
+    const prevNet = parseFloat(prev.net_kbs || "0");
+    const prevIo = parseFloat(prev.io_kbs || "0");
+
+    const pidEl = tr.querySelector(".anim-pid");
+    if (pidEl && Number.isFinite(pidNum) && pidNum > 0) {
+      animateNumber(
+        pidEl,
+        Number.isFinite(prevPid) && prevPid > 0 ? prevPid : pidNum,
+        pidNum,
+        (v) => `${Math.max(0, Math.round(v))}`
+      );
+    }
+    animateNumber(
+      tr.querySelector(".anim-cpu"),
+      toFiniteOr(prevCpu, cpuVal),
+      cpuVal,
+      (v) => `${Math.max(0, Math.round(v))}%`
+    );
+    animateNumber(
+      tr.querySelector(".anim-gpu"),
+      toFiniteOr(prevGpu, gpuVal),
+      gpuVal,
+      (v) => `${Math.max(0, Math.round(v))}%`
+    );
+    animateNumber(
+      tr.querySelector(".anim-ram"),
+      toFiniteOr(prevMem, memVal),
+      memVal,
+      (v) => `${Math.max(0, Math.round(v))}MB`
+    );
+    animateNumber(
+      tr.querySelector(".anim-net"),
+      toFiniteOr(prevNet, netVal),
+      netVal,
+      (v) => `${Math.max(0, Math.round(v))}${netUnit}`
+    );
+    animateNumber(
+      tr.querySelector(".anim-io"),
+      toFiniteOr(prevIo, ioVal),
+      ioVal,
+      (v) => `${Math.max(0, Math.round(v))}${netUnit}`
+    );
   }
 
   lastSnapshot = data;

@@ -103,6 +103,9 @@ tr.hung { background: var(--hung); }
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+.anim-number {
+  font-variant-numeric: tabular-nums;
+}
 .spark {
   display: block;
   opacity: 0.85;

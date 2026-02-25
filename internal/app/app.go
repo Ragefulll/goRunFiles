@@ -455,11 +455,37 @@ func (a *App) StopProcess(name string) error {
 
 // RestartProcess restarts a process by config name.
 func (a *App) RestartProcess(name string) error {
-	if err := a.StopProcess(name); err != nil {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	item, ok := a.cfg.Process[name]
+	if !ok {
+		return fmt.Errorf("process %q not found", name)
+	}
+
+	// Manual RESTART should not leave the process in manual-stop mode.
+	delete(a.manualStop, name)
+	delete(a.restartAt, name)
+	delete(a.hungSince, name)
+	// Explicit restart enables the process for regular monitoring.
+	item.Disabled = false
+
+	if err := stopProcessItem(item); err != nil {
 		return err
 	}
-	delete(a.manualStop, name)
-	return a.StartProcess(name)
+
+	pid, err := runner.Start(item, a.cfg.Settings.LaunchInNewConsole)
+	if err != nil {
+		a.last[name] = StatusStopped
+		return err
+	}
+
+	item.Pid = pid
+	a.last[name] = StatusStarted
+	if pid > 0 {
+		a.startTimes[pid] = time.Now().UnixMilli()
+	}
+	return nil
 }
 
 // RestartAll restarts all enabled processes.
