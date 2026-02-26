@@ -19,7 +19,7 @@ func (s Status) Icon() string {
 	case StatusStarted:
 		return "☆︎ START   "
 	case StatusStopped:
-		return "✗︎ NRUN    "
+		return "✗︎ STOPED  "
 	case StatusDisabled:
 		return "⛔︎ DISABLED"
 	default:
