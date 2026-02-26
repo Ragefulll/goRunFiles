@@ -11,6 +11,7 @@ const toggleBtn = document.getElementById("toggleConfig");
 const restartAllBtn = document.getElementById("restartAll");
 const killCMDBtn = document.getElementById("killCMD");
 const killNodeBtn = document.getElementById("killNode");
+const toggleConsoleBtn = document.getElementById("toggleConsole");
 const addProcessBtn = document.getElementById("addProcess");
 const configPanel = document.getElementById("configPanel");
 const configPassword = document.getElementById("configPassword");
@@ -20,6 +21,8 @@ const closeAuth = document.getElementById("closeAuth");
 const cancelAuth = document.getElementById("cancelAuth");
 const configModal = document.getElementById("configModal");
 const closeConfig = document.getElementById("closeConfig");
+const errorConsoleContainer = document.getElementById("errorConsoleContainer");
+const errorConsole = document.getElementById("errorConsole");
 
 const cfgCheckTiming = document.getElementById("cfgCheckTiming");
 const cfgRestartTiming = document.getElementById("cfgRestartTiming");
@@ -37,6 +40,10 @@ const HISTORY_LEN = 40;
 const metricHistory = new Map();
 let sparkSeq = 0;
 const ANIM_DURATION_MS = 320;
+const ERROR_LOG_MAX = 600;
+const errorLogLines = [];
+const lastErrorByProcess = new Map();
+let consoleOpened = false;
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
@@ -114,6 +121,40 @@ const animateNumber = (el, from, to, format, duration = ANIM_DURATION_MS) => {
   requestAnimationFrame(step);
 };
 
+const appendErrorLog = (line) => {
+  if (!line) return;
+  errorLogLines.unshift(line);
+  if (errorLogLines.length > ERROR_LOG_MAX) {
+    errorLogLines.splice(ERROR_LOG_MAX);
+  }
+  if (errorConsole) {
+    errorConsole.value = errorLogLines.join("\n");
+    if (consoleOpened) {
+      errorConsole.scrollTop = 0;
+    }
+  }
+};
+
+const collectErrorLog = (data) => {
+  const stamp = data?.updated || new Date().toISOString().replace("T", " ").slice(0, 19);
+  const activeNames = new Set();
+  for (const it of data.items || []) {
+    const name = it.name || "unknown";
+    activeNames.add(name);
+    const currentError = (it.error || "").trim();
+    const prevError = lastErrorByProcess.get(name) || "";
+    if (currentError && currentError !== prevError) {
+      appendErrorLog(`[${stamp}] ${name}: ${currentError}`);
+    }
+    lastErrorByProcess.set(name, currentError);
+  }
+  for (const name of Array.from(lastErrorByProcess.keys())) {
+    if (!activeNames.has(name)) {
+      lastErrorByProcess.delete(name);
+    }
+  }
+};
+
 const render = (data) => {
   if (!data) return;
   elUpdated.textContent = data.updated || "—";
@@ -127,6 +168,7 @@ const render = (data) => {
   if (elNetDebug) {
     elNetDebug.textContent = data.net_dbg || "—";
   }
+  collectErrorLog(data);
   const netUnit = (data.net_unit || "KB").toUpperCase();
   tbody.innerHTML = "";
 
@@ -209,7 +251,6 @@ const render = (data) => {
         </div>
       </td>
       <td>${it.target || ""}</td>
-      <td>${it.error || ""}</td>
       <td>
         <button data-action="open-folder" data-name="${it.name}" title="Open folder">📁</button>
         <button data-action="start" data-name="${it.name}" ${canStart ? "" : "disabled"}>▶️</button>
@@ -319,6 +360,15 @@ killNodeBtn.addEventListener("click", async () => {
     await api.KillNode();
   } catch (err) {
     console.error(err);
+  }
+});
+
+toggleConsoleBtn.addEventListener("click", () => {
+  consoleOpened = !consoleOpened;
+  errorConsoleContainer.classList.toggle("is-open", consoleOpened);
+  toggleConsoleBtn.classList.toggle("active", consoleOpened);
+  if (consoleOpened && errorConsole) {
+    errorConsole.scrollTop = 0;
   }
 });
 

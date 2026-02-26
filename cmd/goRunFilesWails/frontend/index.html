@@ -11,9 +11,9 @@
       <header class="head">
         <div class="title">ART3D Process Monitor</div>
         <div class="meta">Version: <span id="version">—</span></div>
-        <div class="meta">Updated: <span id="updated">—</span></div>
         <div class="meta">Net: <span id="netStatus">—</span></div>
         <div class="meta">Net Debug: <span id="netDebug">—</span></div>
+        <div class="meta">Updated: <span id="updated">—</span></div>
       </header>
 
       <section class="panel">
@@ -23,6 +23,7 @@
             <button class="panel-actions__button" id="restartAll" title="Restart all" aria-label="Restart all">Restart All</button>
             <button class="panel-actions__button" id="killCMD" title="Kill all cmd.exe" aria-label="Kill all cmd.exe">Kill CMD</button>
             <button class="panel-actions__button" id="killNode" title="Kill all node.exe" aria-label="Kill all node.exe">Kill Node</button>
+            <button class="panel-actions__button" id="toggleConsole" title="Консоль ошибок" aria-label="Консоль ошибок">📋</button>
             <button class="panel-actions__button" id="toggleConfig" title="Настройки" aria-label="Настройки">⚙</button>
           </div>
         </div>
@@ -30,11 +31,14 @@
           <thead>
             <tr>
               <th>NAME</th><th>TYPE</th><th>STATUS</th><th>PID</th>
-              <th>STARTED</th><th>UPTIME</th><th>CPU</th><th>GPU</th><th>RAM</th><th>NET</th><th>IO</th><th>TARGET</th><th>ERROR</th><th>ACTIONS</th>
+              <th>STARTED</th><th>UPTIME</th><th>CPU</th><th>GPU</th><th>RAM</th><th>NET</th><th>IO</th><th>TARGET</th><th>ACTIONS</th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>
         </table>
+        <div id="errorConsoleContainer" class="error-console">
+          <textarea id="errorConsole" readonly spellcheck="false" aria-label="Логи ошибок"></textarea>
+        </div>
       </section>
 
       <section class="panel hidden" id="configContainer"></section>

@@ -37,6 +37,7 @@
   background: #334155;
 }
 body { margin: 0; background: var(--bg); color: var(--text); }
+.hidden { display: none !important; }
 .wrap { max-width: 1900px; margin: 24px auto; padding: 0 16px; }
 .head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .title { font-size: 20px; font-weight: 600; letter-spacing: .5px; }
@@ -47,6 +48,11 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 .panel h2 { margin: 0; font-size: 14px; color: var(--muted); letter-spacing: .4px; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 #toggleConfig { font-size: 16px; padding: 4px 8px; }
+#toggleConsole { font-size: 15px; padding: 4px 8px; }
+.panel-actions__button.active {
+  border-color: #3b82f6;
+  color: #93c5fd;
+}
 .panel-actions { display: flex; align-items: center; gap: 8px; }
 .panel-actions__button { font-size: 12px; padding: 6px 10px; border: 1px solid var(--grid); background: #0b0f14; }
 div#configPanel { position: relative; top: 2rem; }
@@ -109,6 +115,34 @@ tr.hung { background: var(--hung); }
 .spark {
   display: block;
   opacity: 0.85;
+}
+
+.error-console {
+  margin-top: 10px;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateY(-6px) scaleY(0.98);
+  transform-origin: top;
+  transition: max-height 280ms ease, opacity 220ms ease, transform 280ms ease;
+}
+.error-console.is-open {
+  max-height: 420px;
+  opacity: 1;
+  transform: translateY(0) scaleY(1);
+}
+.error-console textarea {
+  width: 100%;
+  min-height: 180px;
+  height: 220px;
+  resize: vertical;
+  background: #0b0f14;
+  color: var(--text);
+  border: 1px solid var(--grid);
+  padding: 8px 10px;
+  font-family: "Consolas", ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 button {
