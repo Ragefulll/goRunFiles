@@ -12,11 +12,17 @@ gcc --version
 go run github.com/Velocidex/etw/examples/tracer@latest -events network -kernel_event_type_filter "Send|Recv|TCP|UDP" "{9E814AAD-3204-11D2-9A82-006008A86939}"
 ```
 
-Перед go run:
+Запуск:
 ```.\run.ps1```
+
+Запуск UI:
+```.\run.ps1 - Gui```
 
 Для сборки exe:
 ```.\build.ps1```
+
+Для сборки exe с UI:
+```.\build.ps1 -Gui```
 
 Для корректного `NET` (ETW на Windows) сборка должна быть с `CGO_ENABLED=1` и доступным `gcc` (MinGW-w64 в `PATH`).
 Скрипты `run.ps1` и `build.ps1` теперь включают это автоматически и проверяют наличие `gcc`.
