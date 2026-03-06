@@ -24,6 +24,7 @@ type ProcessItem struct {
 	Process      string
 	CheckProcess string
 	CheckCmdline string
+	CheckCmdlineExclude string
 	MonitorHang  bool
 	HangTimeout  Duration
 	Path         string

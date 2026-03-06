@@ -18,6 +18,7 @@ type ProcessDTO struct {
 	Args         string `json:"args"`
 	CheckProcess string `json:"checkProcess"`
 	CheckCmdline string `json:"checkCmdline"`
+	CheckCmdlineExclude string `json:"checkCmdlineExclude"`
 	MonitorHang  bool   `json:"monitorHang"`
 	HangTimeout  string `json:"hangTimeout"`
 }
@@ -76,6 +77,7 @@ func ToDTO(cfg Config) ConfigDTO {
 			Args:         p.Args,
 			CheckProcess: p.CheckProcess,
 			CheckCmdline: p.CheckCmdline,
+			CheckCmdlineExclude: p.CheckCmdlineExclude,
 			MonitorHang:  p.MonitorHang,
 			HangTimeout:  durString(p.HangTimeout),
 		})
@@ -131,6 +133,7 @@ func FromDTO(dto ConfigDTO) (Config, error) {
 			Args:         p.Args,
 			CheckProcess: p.CheckProcess,
 			CheckCmdline: p.CheckCmdline,
+			CheckCmdlineExclude: p.CheckCmdlineExclude,
 			MonitorHang:  p.MonitorHang,
 			HangTimeout:  ht,
 		}

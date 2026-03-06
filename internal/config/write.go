@@ -42,6 +42,9 @@ func WriteFromDTO(path string, dto ConfigDTO) error {
 		if p.CheckCmdline != "" {
 			b.WriteString(fmt.Sprintf("checkCmdline=%s\n", quoteIfNeeded(p.CheckCmdline)))
 		}
+		if p.CheckCmdlineExclude != "" {
+			b.WriteString(fmt.Sprintf("checkCmdlineExclude=%s\n", quoteIfNeeded(p.CheckCmdlineExclude)))
+		}
 		if p.Args != "" {
 			b.WriteString(fmt.Sprintf("args=%s\n", quoteIfNeeded(p.Args)))
 		}

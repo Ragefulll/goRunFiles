@@ -31,7 +31,7 @@ func RepairFile(path string) (bool, error) {
 		}
 		// Quote values for known keys if they include backslashes/spaces/commas.
 		if key == "path" || key == "process" || key == "command" || key == "checkProcess" ||
-			key == "checkCmdline" || key == "args" || key == "errorWindowTitles" {
+			key == "checkCmdline" || key == "checkCmdlineExclude" || key == "args" || key == "errorWindowTitles" {
 			quoted := val
 			if strings.HasPrefix(quoted, `"`) && strings.HasSuffix(quoted, `"`) {
 				inner := strings.TrimSuffix(strings.TrimPrefix(quoted, `"`), `"`)

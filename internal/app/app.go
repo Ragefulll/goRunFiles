@@ -236,7 +236,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			}
 		case config.TypeCmd:
 			if strings.TrimSpace(item.CheckCmdline) != "" {
-				ok, pid, err := process.ByNameAndCmdlineArgsExact(item.CheckProcess, item.CheckCmdline)
+				ok, pid, err := process.ByNameAndCmdlineArgsExactWithExclude(item.CheckProcess, item.CheckCmdline, item.CheckCmdlineExclude)
 				if err != nil {
 					status.Err = err.Error()
 				}
@@ -269,7 +269,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			}
 			checkCmdline := strings.TrimSpace(item.CheckCmdline)
 			if checkCmdline != "" {
-				ok, pid, err := process.ByNameAndCmdlineArgsExact(item.CheckProcess, checkCmdline)
+				ok, pid, err := process.ByNameAndCmdlineArgsExactWithExclude(item.CheckProcess, checkCmdline, item.CheckCmdlineExclude)
 				if err != nil {
 					status.Err = err.Error()
 				}
@@ -867,7 +867,7 @@ func stopProcessItem(item *config.ProcessItem) error {
 		return lastErr
 	case config.TypeCmd, config.TypeBat:
 		if strings.TrimSpace(item.CheckCmdline) != "" {
-			if err := process.KillByNameAndCmdlineArgsExact(item.CheckProcess, item.CheckCmdline); err != nil {
+			if err := process.KillByNameAndCmdlineArgsExactWithExclude(item.CheckProcess, item.CheckCmdline, item.CheckCmdlineExclude); err != nil {
 				return err
 			}
 			item.Pid = 0
@@ -911,7 +911,7 @@ func isProcessItemAlive(item *config.ProcessItem) (bool, int, error) {
 		return false, 0, lastErr
 	case config.TypeCmd, config.TypeBat:
 		if strings.TrimSpace(item.CheckCmdline) != "" {
-			ok, pid, err := process.ByNameAndCmdlineArgsExact(item.CheckProcess, item.CheckCmdline)
+			ok, pid, err := process.ByNameAndCmdlineArgsExactWithExclude(item.CheckProcess, item.CheckCmdline, item.CheckCmdlineExclude)
 			if err != nil {
 				return false, 0, err
 			}

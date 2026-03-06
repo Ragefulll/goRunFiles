@@ -44,6 +44,7 @@ const ERROR_LOG_MAX = 600;
 const errorLogLines = [];
 const lastErrorByProcess = new Map();
 let consoleOpened = false;
+const CMD_CHECK_CMDLINE_EXCLUDE_DEFAULT = "jetbrains,js-language-service,typingsinstaller,eslint";
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
@@ -392,6 +393,8 @@ const renderConfig = (model) => {
 };
 
 const buildProcessRow = (p = {}) => {
+  const initialType = p.type || "exe";
+  const initialExclude = p.checkCmdlineExclude || (initialType === "cmd" ? CMD_CHECK_CMDLINE_EXCLUDE_DEFAULT : "");
   const card = document.createElement("div");
   card.className = "process-card";
   card.innerHTML = `
@@ -427,6 +430,9 @@ const buildProcessRow = (p = {}) => {
       <label>CheckCmdline
         <input data-f="checkCmdline" value="${p.checkCmdline || ""}" />
       </label>
+      <label>CheckCmdlineExclude
+        <input data-f="checkCmdlineExclude" value="${initialExclude}" />
+      </label>
       <label>MonitorHang
         <input data-f="monitorHang" type="checkbox" ${p.monitorHang ? "checked" : ""} />
       </label>
@@ -438,7 +444,15 @@ const buildProcessRow = (p = {}) => {
       <button data-action="remove">Remove</button>
     </div>
   `;
-  card.querySelector('select[data-f="type"]').value = p.type || "exe";
+  const typeSelect = card.querySelector('select[data-f="type"]');
+  typeSelect.value = initialType;
+  typeSelect.addEventListener("change", () => {
+    const excludeInput = card.querySelector('input[data-f="checkCmdlineExclude"]');
+    if (!excludeInput) return;
+    if (typeSelect.value === "cmd" && !(excludeInput.value || "").trim()) {
+      excludeInput.value = CMD_CHECK_CMDLINE_EXCLUDE_DEFAULT;
+    }
+  });
   return card;
 };
 
@@ -461,6 +475,7 @@ const collectConfig = () => {
       args: get("args").value,
       checkProcess: get("checkProcess").value,
       checkCmdline: get("checkCmdline").value,
+      checkCmdlineExclude: get("checkCmdlineExclude").value,
       monitorHang: get("monitorHang").checked,
       hangTimeout: get("hangTimeout").value,
     });

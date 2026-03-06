@@ -2,6 +2,7 @@ package process
 
 import (
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -119,10 +120,19 @@ func StartTime(pid int) (time.Time, bool) {
 }
 
 // ByNameAndCmdlineArgsExact reports if a process with the given name has cmdline
-// containing the exact argument sequence (token match). If multiple matches
-// exist, returns the newest (largest start time). If name is empty, matches any
-// process by cmdline.
+// containing the argument sequence (token match). Matching is performed against
+// the process command line only (cwd is intentionally ignored to avoid false
+// positives for unrelated processes started from the same project folder). If
+// multiple matches exist, returns the newest (largest start time). If name is
+// empty, matches any process by cmdline.
 func ByNameAndCmdlineArgsExact(name, args string) (bool, int, error) {
+	return ByNameAndCmdlineArgsExactWithExclude(name, args, "")
+}
+
+// ByNameAndCmdlineArgsExactWithExclude reports if a process with the given name has
+// cmdline/cwd containing args sequence and does not match exclude sequence(s).
+// Exclude accepts comma-separated patterns.
+func ByNameAndCmdlineArgsExactWithExclude(name, args, exclude string) (bool, int, error) {
 	name = strings.ToLower(strings.TrimSpace(name))
 	args = strings.TrimSpace(args)
 	if args == "" {
@@ -132,6 +142,7 @@ func ByNameAndCmdlineArgsExact(name, args string) (bool, int, error) {
 	if len(needle) == 0 {
 		return false, 0, nil
 	}
+	excludeGroups := parsePatternGroups(exclude)
 	processes, err := process.Processes()
 	if err != nil {
 		return false, 0, err
@@ -152,6 +163,9 @@ func ByNameAndCmdlineArgsExact(name, args string) (bool, int, error) {
 		if !containsTokenSequence(tokens, needle) {
 			continue
 		}
+		if matchesAnyPatternGroup(tokens, excludeGroups) {
+			continue
+		}
 		start, err := p.CreateTime()
 		if err == nil && start >= bestStart {
 			bestStart = start
@@ -168,6 +182,12 @@ func ByNameAndCmdlineArgsExact(name, args string) (bool, int, error) {
 
 // PidsByNameAndCmdlineArgsExact returns all PIDs with cmdline containing exact args sequence.
 func PidsByNameAndCmdlineArgsExact(name, args string) ([]int, error) {
+	return PidsByNameAndCmdlineArgsExactWithExclude(name, args, "")
+}
+
+// PidsByNameAndCmdlineArgsExactWithExclude returns all PIDs with cmdline/cwd containing exact args sequence.
+// Exclude accepts comma-separated patterns.
+func PidsByNameAndCmdlineArgsExactWithExclude(name, args, exclude string) ([]int, error) {
 	name = strings.ToLower(strings.TrimSpace(name))
 	args = strings.TrimSpace(args)
 	if args == "" {
@@ -177,6 +197,7 @@ func PidsByNameAndCmdlineArgsExact(name, args string) ([]int, error) {
 	if len(needle) == 0 {
 		return nil, nil
 	}
+	excludeGroups := parsePatternGroups(exclude)
 	processes, err := process.Processes()
 	if err != nil {
 		return nil, err
@@ -196,6 +217,9 @@ func PidsByNameAndCmdlineArgsExact(name, args string) ([]int, error) {
 		if !containsTokenSequence(tokens, needle) {
 			continue
 		}
+		if matchesAnyPatternGroup(tokens, excludeGroups) {
+			continue
+		}
 		out = append(out, int(p.Pid))
 	}
 	return out, nil
@@ -206,7 +230,8 @@ func processMatchTokens(p *process.Process) []string {
 	if cmd, err := p.Cmdline(); err == nil && cmd != "" {
 		out = append(out, parseCmdlineTokens(cmd)...)
 	}
-	// npm/node workflows often keep project path in cwd (not in cmdline).
+	// Some Windows node child processes can expose empty cmdline, but cwd still
+	// points to project folder and is useful for matching.
 	if cwd, err := p.Cwd(); err == nil && cwd != "" {
 		out = append(out, parseCmdlineTokens(cwd)...)
 	}
@@ -236,7 +261,12 @@ func normalizeProcessName(name string) string {
 
 // KillByNameAndCmdlineArgsExact terminates all matching processes.
 func KillByNameAndCmdlineArgsExact(name, args string) error {
-	pids, err := PidsByNameAndCmdlineArgsExact(name, args)
+	return KillByNameAndCmdlineArgsExactWithExclude(name, args, "")
+}
+
+// KillByNameAndCmdlineArgsExactWithExclude terminates matching processes and applies exclude patterns.
+func KillByNameAndCmdlineArgsExactWithExclude(name, args, exclude string) error {
+	pids, err := PidsByNameAndCmdlineArgsExactWithExclude(name, args, exclude)
 	if err != nil {
 		return err
 	}
@@ -247,6 +277,31 @@ func KillByNameAndCmdlineArgsExact(name, args string) error {
 		}
 	}
 	return lastErr
+}
+
+func parsePatternGroups(raw string) [][]string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([][]string, 0, len(parts))
+	for _, p := range parts {
+		tokens := parseCmdlineTokens(strings.TrimSpace(p))
+		if len(tokens) > 0 {
+			out = append(out, tokens)
+		}
+	}
+	return out
+}
+
+func matchesAnyPatternGroup(haystack []string, patterns [][]string) bool {
+	for _, p := range patterns {
+		if containsTokenSequence(haystack, p) {
+			return true
+		}
+	}
+	return false
 }
 
 func parseCmdlineTokens(s string) []string {
@@ -288,7 +343,7 @@ func containsTokenSequence(haystack, needle []string) bool {
 	for _, n := range needle {
 		found := false
 		for h < len(haystack) {
-			if strings.Contains(haystack[h], n) {
+			if tokenMatchesNeedle(haystack[h], n) {
 				found = true
 				break
 			}
@@ -299,4 +354,65 @@ func containsTokenSequence(haystack, needle []string) bool {
 		}
 	}
 	return true
+}
+
+func tokenMatchesNeedle(token, needle string) bool {
+	t := strings.ToLower(strings.TrimSpace(token))
+	n := strings.ToLower(strings.TrimSpace(needle))
+	t = strings.Trim(t, "\"'")
+	n = strings.Trim(n, "\"'")
+	if t == "" || n == "" {
+		return false
+	}
+	if t == n {
+		return true
+	}
+	if strings.TrimSuffix(t, ".exe") == strings.TrimSuffix(n, ".exe") {
+		return true
+	}
+	parts := splitTokenParts(t)
+	for _, part := range parts {
+		if part == n {
+			return true
+		}
+		if strings.TrimSuffix(part, ".exe") == strings.TrimSuffix(n, ".exe") {
+			return true
+		}
+	}
+	return false
+}
+
+func splitTokenParts(s string) []string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	seps := func(r rune) bool {
+		switch r {
+		case '\\', '/', '=', ':', ';', ',', '(', ')', '[', ']', '{', '}':
+			return true
+		default:
+			return false
+		}
+	}
+	parts := strings.FieldsFunc(s, seps)
+	uniq := make(map[string]struct{}, len(parts)+2)
+	out := make([]string, 0, len(parts)+2)
+	add := func(v string) {
+		v = strings.TrimSpace(strings.ToLower(v))
+		if v == "" {
+			return
+		}
+		if _, ok := uniq[v]; ok {
+			return
+		}
+		uniq[v] = struct{}{}
+		out = append(out, v)
+	}
+	add(s)
+	add(filepath.Base(s))
+	for _, p := range parts {
+		add(p)
+	}
+	return out
 }
