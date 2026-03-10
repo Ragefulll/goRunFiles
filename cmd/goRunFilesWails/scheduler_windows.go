@@ -78,6 +78,10 @@ func (g *GUI) InstallScheduler() error {
 	if err != nil {
 		return fmt.Errorf("schtasks create: %v: %s", err, strings.TrimSpace(string(out)))
 	}
+	out, err = exec.Command("schtasks", "/Run", "/TN", schedulerTaskName).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("schtasks run: %v: %s", err, strings.TrimSpace(string(out)))
+	}
 	return nil
 }
 
