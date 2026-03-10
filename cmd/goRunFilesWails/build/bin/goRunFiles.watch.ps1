@@ -1,12 +1,12 @@
 param(
     [string]$ExePath = 'D:\dev\www\goRunFiles\cmd\goRunFilesWails\build\bin\goRunFiles.exe',
-    [int]$RestartOnExit = 1
+    [int]$RestartOnExit = 0
 )
 $ErrorActionPreference = 'Stop'
 if (-not (Test-Path -LiteralPath $ExePath)) { exit 2 }
 
 if ($RestartOnExit -ne 1) {
-    $p = Start-Process -FilePath $ExePath -PassThru
+    $p = Start-Process -FilePath $ExePath -WorkingDirectory (Split-Path -LiteralPath $ExePath) -PassThru
     try { $p.WaitForExit() } catch { }
     exit 0
 }
@@ -18,7 +18,7 @@ while ($true) {
         Start-Sleep -Seconds 1
         continue
     }
-    $p = Start-Process -FilePath $ExePath -PassThru
+    $p = Start-Process -FilePath $ExePath -WorkingDirectory (Split-Path -LiteralPath $ExePath) -PassThru
     try { $p.WaitForExit() } catch { Start-Sleep -Seconds 1 }
     Start-Sleep -Seconds 1
 }
