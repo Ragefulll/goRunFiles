@@ -7,6 +7,19 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$rootConfig = Join-Path $PSScriptRoot "config.ini"
+
+function Copy-ConfigNextToExe {
+  param([string]$ExePath)
+  if (-not (Test-Path $rootConfig)) { return }
+  if ([string]::IsNullOrWhiteSpace($ExePath)) { return }
+  $destDir = Split-Path -Parent $ExePath
+  if (-not (Test-Path $destDir)) {
+    New-Item -ItemType Directory -Path $destDir | Out-Null
+  }
+  Copy-Item $rootConfig (Join-Path $destDir "config.ini") -Force
+}
+
 function Enable-CgoIfWindows {
   if (-not $IsWindows) { return }
   $env:CGO_ENABLED = "1"
@@ -31,6 +44,12 @@ if (-not $NoGenerate) {
 }
 
 if ($Exe -ne "") {
+  try {
+    $resolvedExe = (Resolve-Path -LiteralPath $Exe).Path
+  } catch {
+    $resolvedExe = $Exe
+  }
+  Copy-ConfigNextToExe $resolvedExe
   & $Exe
   exit $LASTEXITCODE
 }

@@ -5,6 +5,19 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$rootConfig = Join-Path $PSScriptRoot "config.ini"
+
+function Copy-ConfigNextToExe {
+  param([string]$ExePath)
+  if (-not (Test-Path $rootConfig)) { return }
+  if ([string]::IsNullOrWhiteSpace($ExePath)) { return }
+  $destDir = Split-Path -Parent $ExePath
+  if (-not (Test-Path $destDir)) {
+    New-Item -ItemType Directory -Path $destDir | Out-Null
+  }
+  Copy-Item $rootConfig (Join-Path $destDir "config.ini") -Force
+}
+
 function Enable-CgoIfWindows {
   if (-not $IsWindows) { return }
   $env:CGO_ENABLED = "1"
@@ -43,8 +56,26 @@ if ($Gui) {
   Push-Location .\cmd\goRunFilesWails
   wails build -ldflags "-X main.buildVersion=$newVersion -H windowsgui"
   Pop-Location
+  if ($LASTEXITCODE -eq 0) {
+    $wailsConfig = Join-Path $PSScriptRoot "cmd\goRunFilesWails\wails.json"
+    $outputName = "goRunFiles"
+    if (Test-Path $wailsConfig) {
+      try {
+        $outputName = (Get-Content $wailsConfig | ConvertFrom-Json).outputfilename
+      } catch {
+        $outputName = "goRunFiles"
+      }
+    }
+    $exeName = $outputName
+    if ($IsWindows) { $exeName = "$exeName.exe" }
+    $guiExe = Join-Path $PSScriptRoot "cmd\goRunFilesWails\build\bin\$exeName"
+    Copy-ConfigNextToExe $guiExe
+  }
   exit $LASTEXITCODE
 }
 
 Enable-CgoIfWindows
 go build -ldflags "-X main.buildVersion=$newVersion" -o $Out .\cmd\goRunFiles
+if ($LASTEXITCODE -eq 0) {
+  Copy-ConfigNextToExe $Out
+}
