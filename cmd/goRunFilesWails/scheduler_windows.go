@@ -149,7 +149,7 @@ $ErrorActionPreference = 'Stop'
 if (-not (Test-Path -LiteralPath $ExePath)) { exit 2 }
 
 if ($RestartOnExit -ne 1) {
-    $p = Start-Process -FilePath $ExePath -PassThru
+    $p = Start-Process -FilePath $ExePath -WindowStyle Hidden -PassThru
     try { $p.WaitForExit() } catch { }
     exit 0
 }
@@ -161,7 +161,7 @@ while ($true) {
         Start-Sleep -Seconds 1
         continue
     }
-    $p = Start-Process -FilePath $ExePath -PassThru
+    $p = Start-Process -FilePath $ExePath -WindowStyle Hidden -PassThru
     try { $p.WaitForExit() } catch { Start-Sleep -Seconds 1 }
     Start-Sleep -Seconds 1
 }
@@ -175,7 +175,7 @@ func buildSchedulerCommand(scriptPath, exePath string, restartOnExit bool) strin
 	if restartOnExit {
 		flag = "1"
 	}
-	return fmt.Sprintf("powershell -NoProfile -ExecutionPolicy Bypass -File %s -ExePath %s -RestartOnExit %s", quotedScript, quotedExe, flag)
+	return fmt.Sprintf("powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File %s -ExePath %s -RestartOnExit %s", quotedScript, quotedExe, flag)
 }
 
 func queryScheduler() (schedulerQuery, error) {
