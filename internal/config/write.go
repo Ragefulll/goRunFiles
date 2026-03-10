@@ -69,6 +69,7 @@ func WriteFromDTO(path string, dto ConfigDTO) error {
 	if strings.TrimSpace(dto.Settings.AutoRestartTime) != "" {
 		b.WriteString(fmt.Sprintf("autoRestartTime=%s\n", dto.Settings.AutoRestartTime))
 	}
+	b.WriteString(fmt.Sprintf("autoRestartOnExit=%v\n", dto.Settings.AutoRestartOnExit))
 	b.WriteString(fmt.Sprintf("launchInNewConsole=%v\n", dto.Settings.LaunchInNewConsole))
 	b.WriteString(fmt.Sprintf("autoCloseErrorDialogs=%v\n", dto.Settings.AutoCloseErrorDialogs))
 	b.WriteString(fmt.Sprintf("useETWNetwork=%v\n", dto.Settings.UseETWNetwork))

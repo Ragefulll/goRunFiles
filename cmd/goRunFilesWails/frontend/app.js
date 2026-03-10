@@ -23,11 +23,20 @@ const configModal = document.getElementById("configModal");
 const closeConfig = document.getElementById("closeConfig");
 const errorConsoleContainer = document.getElementById("errorConsoleContainer");
 const errorConsole = document.getElementById("errorConsole");
+const schedulerTask = document.getElementById("schedulerTask");
+const schedulerState = document.getElementById("schedulerState");
+const schedulerLastRun = document.getElementById("schedulerLastRun");
+const schedulerLastResult = document.getElementById("schedulerLastResult");
+const schedulerNote = document.getElementById("schedulerNote");
+const installSchedulerBtn = document.getElementById("installScheduler");
+const removeSchedulerBtn = document.getElementById("removeScheduler");
+const refreshSchedulerBtn = document.getElementById("refreshScheduler");
 
 const cfgCheckTiming = document.getElementById("cfgCheckTiming");
 const cfgRestartTiming = document.getElementById("cfgRestartTiming");
 const cfgAutoRestart = document.getElementById("cfgAutoRestart");
 const cfgAutoRestartTime = document.getElementById("cfgAutoRestartTime");
+const cfgAutoRestartOnExit = document.getElementById("cfgAutoRestartOnExit");
 const cfgUseETWNetwork = document.getElementById("cfgUseETWNetwork");
 const cfgNetDebug = document.getElementById("cfgNetDebug");
 const cfgNetUnit = document.getElementById("cfgNetUnit");
@@ -382,6 +391,7 @@ const renderConfig = (model) => {
   cfgRestartTiming.value = s.restartTiming || "";
   cfgAutoRestart.checked = !!s.autoRestart;
   cfgAutoRestartTime.value = s.autoRestartTime || "";
+  cfgAutoRestartOnExit.checked = !!s.autoRestartOnExit;
   cfgUseETWNetwork.checked = !!s.useETWNetwork;
   cfgNetDebug.checked = !!s.netDebug;
   cfgNetUnit.value = (s.netUnit || "KB").toUpperCase();
@@ -490,6 +500,7 @@ const collectConfig = () => {
       restartTiming: cfgRestartTiming.value,
       autoRestart: cfgAutoRestart.checked,
       autoRestartTime: cfgAutoRestartTime.value,
+      autoRestartOnExit: cfgAutoRestartOnExit.checked,
       useETWNetwork: cfgUseETWNetwork.checked,
       netDebug: cfgNetDebug.checked,
       netUnit: cfgNetUnit.value,
@@ -534,6 +545,7 @@ window.onload = async () => {
       renderConfig(model);
     }
   }
+  await refreshSchedulerStatus();
   lockConfig();
   configPanel.classList.add("hidden");
   document.querySelector(".config-actions").classList.add("hidden");
@@ -580,6 +592,7 @@ const unlockConfig = async () => {
   configModal.classList.remove("hidden");
   const model = await api.GetConfigModel();
   renderConfig(model);
+  await refreshSchedulerStatus();
 };
 
 unlockBtn.addEventListener("click", unlockConfig);
@@ -610,6 +623,66 @@ configModal.addEventListener("click", (e) => {
     lockConfig();
   }
 });
+
+const renderSchedulerStatus = (s) => {
+  if (!s || !schedulerTask || !schedulerState || !schedulerLastRun || !schedulerLastResult || !schedulerNote) return;
+  schedulerTask.textContent = s.taskName || "—";
+  if (!s.installed) {
+    schedulerState.textContent = "Not installed";
+  } else {
+    schedulerState.textContent = s.running ? "Running" : (s.state || "Installed");
+  }
+  schedulerLastRun.textContent = s.lastRunTime || "—";
+  schedulerLastResult.textContent = Number.isFinite(s.lastTaskResult) ? String(s.lastTaskResult) : "—";
+  const noteParts = [];
+  if (s.installed) {
+    noteParts.push("Watchdog restarts app on exit.");
+  } else {
+    noteParts.push("Install to auto-start with admin rights.");
+  }
+  if (s.error) {
+    noteParts.push(s.error);
+  }
+  schedulerNote.textContent = noteParts.join(" ");
+};
+
+const refreshSchedulerStatus = async () => {
+  if (!api) return;
+  try {
+    const s = await api.GetSchedulerStatus();
+    renderSchedulerStatus(s);
+  } catch (err) {
+    renderSchedulerStatus({ taskName: "—", error: err.message || String(err) });
+  }
+};
+
+if (installSchedulerBtn) {
+  installSchedulerBtn.addEventListener("click", async () => {
+    if (!api) return;
+    try {
+      await api.InstallScheduler();
+      await refreshSchedulerStatus();
+    } catch (err) {
+      alert(err.message || String(err));
+    }
+  });
+}
+
+if (removeSchedulerBtn) {
+  removeSchedulerBtn.addEventListener("click", async () => {
+    if (!api) return;
+    try {
+      await api.RemoveScheduler();
+      await refreshSchedulerStatus();
+    } catch (err) {
+      alert(err.message || String(err));
+    }
+  });
+}
+
+if (refreshSchedulerBtn) {
+  refreshSchedulerBtn.addEventListener("click", refreshSchedulerStatus);
+}
 
 
 // Checkbox pulse animation

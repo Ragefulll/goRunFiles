@@ -1,7 +1,9 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -39,6 +41,7 @@ type Settings struct {
 	RestartTiming         Duration
 	AutoRestart           bool
 	AutoRestartTime       string
+	AutoRestartOnExit     bool
 	LaunchInNewConsole    bool
 	AutoCloseErrorDialogs bool
 	ErrorWindowTitles     string
@@ -58,6 +61,12 @@ func Load(path string) (Config, error) {
 	var cfg Config
 	if err := gcfg.ReadFileInto(&cfg, path); err != nil {
 		return Config{}, err
+	}
+	if data, err := os.ReadFile(path); err == nil {
+		lower := bytes.ToLower(data)
+		if !bytes.Contains(lower, []byte("autorestartonexit")) {
+			cfg.Settings.AutoRestartOnExit = true
+		}
 	}
 	return cfg, nil
 }

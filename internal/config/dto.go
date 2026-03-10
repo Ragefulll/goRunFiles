@@ -29,6 +29,7 @@ type SettingsDTO struct {
 	RestartTiming         string `json:"restartTiming"`
 	AutoRestart           bool   `json:"autoRestart"`
 	AutoRestartTime       string `json:"autoRestartTime"`
+	AutoRestartOnExit     bool   `json:"autoRestartOnExit"`
 	LaunchInNewConsole    bool   `json:"launchInNewConsole"`
 	AutoCloseErrorDialogs bool   `json:"autoCloseErrorDialogs"`
 	ErrorWindowTitles     string `json:"errorWindowTitles"`
@@ -59,6 +60,7 @@ func ToDTO(cfg Config) ConfigDTO {
 			RestartTiming:         durString(cfg.Settings.RestartTiming),
 			AutoRestart:           cfg.Settings.AutoRestart,
 			AutoRestartTime:       cfg.Settings.AutoRestartTime,
+			AutoRestartOnExit:     cfg.Settings.AutoRestartOnExit,
 			LaunchInNewConsole:    cfg.Settings.LaunchInNewConsole,
 			AutoCloseErrorDialogs: cfg.Settings.AutoCloseErrorDialogs,
 			ErrorWindowTitles:     cfg.Settings.ErrorWindowTitles,
@@ -108,6 +110,7 @@ func FromDTO(dto ConfigDTO) (Config, error) {
 
 	cfg.Settings.AutoRestart = dto.Settings.AutoRestart
 	cfg.Settings.AutoRestartTime = strings.TrimSpace(dto.Settings.AutoRestartTime)
+	cfg.Settings.AutoRestartOnExit = dto.Settings.AutoRestartOnExit
 	if cfg.Settings.AutoRestart {
 		if err := validateAutoRestartTime(cfg.Settings.AutoRestartTime); err != nil {
 			return Config{}, fmt.Errorf("autoRestartTime: %w", err)

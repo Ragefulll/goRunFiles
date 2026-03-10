@@ -197,5 +197,8 @@ func (g *GUI) SaveConfigModel(dto config.ConfigDTO) error {
 		return err
 	}
 	g.mon.UpdateConfig(cfg)
+	if err := updateSchedulerScriptIfInstalled(cfg); err != nil {
+		return err
+	}
 	return nil
 }

@@ -74,6 +74,21 @@
           <button class="panel-actions__button fixed" id="addProcess">Add process</button>
         </div>
         <div id="configPanel" class="config-panel">
+          <h3>Scheduler</h3>
+          <div class="scheduler">
+            <div class="scheduler-status">
+              <div>Task: <span id="schedulerTask">—</span></div>
+              <div>Status: <span id="schedulerState">—</span></div>
+              <div>Last run: <span id="schedulerLastRun">—</span></div>
+              <div>Last result: <span id="schedulerLastResult">—</span></div>
+              <div class="scheduler-note" id="schedulerNote">—</div>
+            </div>
+            <div class="scheduler-actions">
+              <button class="panel-actions__button fixed" id="installScheduler">Install</button>
+              <button class="panel-actions__button fixed" id="removeScheduler">Remove</button>
+              <button class="panel-actions__button fixed" id="refreshScheduler">Refresh</button>
+            </div>
+          </div>
           <div class="config-grid">
             <label>Check timing
               <input id="cfgCheckTiming" placeholder="500ms" />
@@ -86,6 +101,9 @@
             </label>
             <label>Auto restart time
               <input id="cfgAutoRestartTime" type="time" step="60" placeholder="04:00" />
+            </label>
+            <label>Restart on exit (scheduler)
+              <input id="cfgAutoRestartOnExit" type="checkbox" />
             </label>
             <label>Use ETW network
               <input id="cfgUseETWNetwork" type="checkbox" />

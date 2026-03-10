@@ -230,6 +230,34 @@ label input, .config-panel input[type="text"], .config-panel input[type="number"
 }
 
 .config-panel h3 { margin: 12px 0 8px 0; font-size: 13px; color: var(--muted); }
+.scheduler {
+  border: 1px solid var(--grid);
+  background: #10141b;
+  padding: 10px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.scheduler-status {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.scheduler-status span {
+  color: var(--text);
+}
+.scheduler-note {
+  color: #93c5fd;
+}
+.scheduler-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .process-list {
   display: grid;
   gap: 10px;
