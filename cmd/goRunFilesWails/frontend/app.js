@@ -26,6 +26,8 @@ const errorConsole = document.getElementById("errorConsole");
 
 const cfgCheckTiming = document.getElementById("cfgCheckTiming");
 const cfgRestartTiming = document.getElementById("cfgRestartTiming");
+const cfgAutoRestart = document.getElementById("cfgAutoRestart");
+const cfgAutoRestartTime = document.getElementById("cfgAutoRestartTime");
 const cfgUseETWNetwork = document.getElementById("cfgUseETWNetwork");
 const cfgNetDebug = document.getElementById("cfgNetDebug");
 const cfgNetUnit = document.getElementById("cfgNetUnit");
@@ -378,6 +380,8 @@ const renderConfig = (model) => {
   const s = model.settings || {};
   cfgCheckTiming.value = s.checkTiming || "";
   cfgRestartTiming.value = s.restartTiming || "";
+  cfgAutoRestart.checked = !!s.autoRestart;
+  cfgAutoRestartTime.value = s.autoRestartTime || "";
   cfgUseETWNetwork.checked = !!s.useETWNetwork;
   cfgNetDebug.checked = !!s.netDebug;
   cfgNetUnit.value = (s.netUnit || "KB").toUpperCase();
@@ -484,6 +488,8 @@ const collectConfig = () => {
     settings: {
       checkTiming: cfgCheckTiming.value,
       restartTiming: cfgRestartTiming.value,
+      autoRestart: cfgAutoRestart.checked,
+      autoRestartTime: cfgAutoRestartTime.value,
       useETWNetwork: cfgUseETWNetwork.checked,
       netDebug: cfgNetDebug.checked,
       netUnit: cfgNetUnit.value,

@@ -9,24 +9,26 @@ import (
 
 // ProcessDTO is a UI-friendly view of ProcessItem.
 type ProcessDTO struct {
-	Name         string `json:"name"`
-	Disabled     bool   `json:"disabled"`
-	Type         string `json:"type"`
-	Process      string `json:"process"`
-	Path         string `json:"path"`
-	Command      string `json:"command"`
-	Args         string `json:"args"`
-	CheckProcess string `json:"checkProcess"`
-	CheckCmdline string `json:"checkCmdline"`
+	Name                string `json:"name"`
+	Disabled            bool   `json:"disabled"`
+	Type                string `json:"type"`
+	Process             string `json:"process"`
+	Path                string `json:"path"`
+	Command             string `json:"command"`
+	Args                string `json:"args"`
+	CheckProcess        string `json:"checkProcess"`
+	CheckCmdline        string `json:"checkCmdline"`
 	CheckCmdlineExclude string `json:"checkCmdlineExclude"`
-	MonitorHang  bool   `json:"monitorHang"`
-	HangTimeout  string `json:"hangTimeout"`
+	MonitorHang         bool   `json:"monitorHang"`
+	HangTimeout         string `json:"hangTimeout"`
 }
 
 // SettingsDTO is a UI-friendly view of Settings.
 type SettingsDTO struct {
 	CheckTiming           string `json:"checkTiming"`
 	RestartTiming         string `json:"restartTiming"`
+	AutoRestart           bool   `json:"autoRestart"`
+	AutoRestartTime       string `json:"autoRestartTime"`
 	LaunchInNewConsole    bool   `json:"launchInNewConsole"`
 	AutoCloseErrorDialogs bool   `json:"autoCloseErrorDialogs"`
 	ErrorWindowTitles     string `json:"errorWindowTitles"`
@@ -55,6 +57,8 @@ func ToDTO(cfg Config) ConfigDTO {
 		Settings: SettingsDTO{
 			CheckTiming:           durString(cfg.Settings.CheckTiming),
 			RestartTiming:         durString(cfg.Settings.RestartTiming),
+			AutoRestart:           cfg.Settings.AutoRestart,
+			AutoRestartTime:       cfg.Settings.AutoRestartTime,
 			LaunchInNewConsole:    cfg.Settings.LaunchInNewConsole,
 			AutoCloseErrorDialogs: cfg.Settings.AutoCloseErrorDialogs,
 			ErrorWindowTitles:     cfg.Settings.ErrorWindowTitles,
@@ -68,18 +72,18 @@ func ToDTO(cfg Config) ConfigDTO {
 	for _, name := range names {
 		p := cfg.Process[name]
 		out.Processes = append(out.Processes, ProcessDTO{
-			Name:         name,
-			Disabled:     p.Disabled,
-			Type:         p.Type,
-			Process:      p.Process,
-			Path:         p.Path,
-			Command:      p.Command,
-			Args:         p.Args,
-			CheckProcess: p.CheckProcess,
-			CheckCmdline: p.CheckCmdline,
+			Name:                name,
+			Disabled:            p.Disabled,
+			Type:                p.Type,
+			Process:             p.Process,
+			Path:                p.Path,
+			Command:             p.Command,
+			Args:                p.Args,
+			CheckProcess:        p.CheckProcess,
+			CheckCmdline:        p.CheckCmdline,
 			CheckCmdlineExclude: p.CheckCmdlineExclude,
-			MonitorHang:  p.MonitorHang,
-			HangTimeout:  durString(p.HangTimeout),
+			MonitorHang:         p.MonitorHang,
+			HangTimeout:         durString(p.HangTimeout),
 		})
 	}
 	return out
@@ -102,6 +106,13 @@ func FromDTO(dto ConfigDTO) (Config, error) {
 	}
 	cfg.Settings.RestartTiming = d
 
+	cfg.Settings.AutoRestart = dto.Settings.AutoRestart
+	cfg.Settings.AutoRestartTime = strings.TrimSpace(dto.Settings.AutoRestartTime)
+	if cfg.Settings.AutoRestart {
+		if err := validateAutoRestartTime(cfg.Settings.AutoRestartTime); err != nil {
+			return Config{}, fmt.Errorf("autoRestartTime: %w", err)
+		}
+	}
 	cfg.Settings.LaunchInNewConsole = dto.Settings.LaunchInNewConsole
 	cfg.Settings.AutoCloseErrorDialogs = dto.Settings.AutoCloseErrorDialogs
 	cfg.Settings.ErrorWindowTitles = dto.Settings.ErrorWindowTitles
@@ -125,17 +136,17 @@ func FromDTO(dto ConfigDTO) (Config, error) {
 		}
 
 		cfg.Process[name] = &ProcessItem{
-			Disabled:     p.Disabled,
-			Type:         strings.TrimSpace(p.Type),
-			Process:      p.Process,
-			Path:         p.Path,
-			Command:      p.Command,
-			Args:         p.Args,
-			CheckProcess: p.CheckProcess,
-			CheckCmdline: p.CheckCmdline,
+			Disabled:            p.Disabled,
+			Type:                strings.TrimSpace(p.Type),
+			Process:             p.Process,
+			Path:                p.Path,
+			Command:             p.Command,
+			Args:                p.Args,
+			CheckProcess:        p.CheckProcess,
+			CheckCmdline:        p.CheckCmdline,
 			CheckCmdlineExclude: p.CheckCmdlineExclude,
-			MonitorHang:  p.MonitorHang,
-			HangTimeout:  ht,
+			MonitorHang:         p.MonitorHang,
+			HangTimeout:         ht,
 		}
 	}
 	return cfg, nil
@@ -165,4 +176,34 @@ func parseFloatOrZero(s string) float64 {
 		return 0
 	}
 	return v
+}
+
+func validateAutoRestartTime(raw string) error {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return fmt.Errorf("empty")
+	}
+	parts := strings.Split(s, ":")
+	if len(parts) != 2 && len(parts) != 3 {
+		return fmt.Errorf("must be HH:MM or HH:MM:SS")
+	}
+	h, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+	if err != nil {
+		return fmt.Errorf("hour invalid")
+	}
+	m, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if err != nil {
+		return fmt.Errorf("minute invalid")
+	}
+	sec := 0
+	if len(parts) == 3 {
+		sec, err = strconv.Atoi(strings.TrimSpace(parts[2]))
+		if err != nil {
+			return fmt.Errorf("second invalid")
+		}
+	}
+	if h < 0 || h > 23 || m < 0 || m > 59 || sec < 0 || sec > 59 {
+		return fmt.Errorf("out of range")
+	}
+	return nil
 }

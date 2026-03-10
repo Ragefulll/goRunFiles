@@ -20,23 +20,25 @@ const (
 
 // ProcessItem Один процесс
 type ProcessItem struct {
-	Disabled     bool
-	Process      string
-	CheckProcess string
-	CheckCmdline string
+	Disabled            bool
+	Process             string
+	CheckProcess        string
+	CheckCmdline        string
 	CheckCmdlineExclude string
-	MonitorHang  bool
-	HangTimeout  Duration
-	Path         string
-	Command      string
-	Args         string
-	Type         string // exe | cmd
-	Pid          int
+	MonitorHang         bool
+	HangTimeout         Duration
+	Path                string
+	Command             string
+	Args                string
+	Type                string // exe | cmd
+	Pid                 int
 }
 
 type Settings struct {
 	CheckTiming           Duration
 	RestartTiming         Duration
+	AutoRestart           bool
+	AutoRestartTime       string
 	LaunchInNewConsole    bool
 	AutoCloseErrorDialogs bool
 	ErrorWindowTitles     string

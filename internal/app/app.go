@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -32,7 +33,21 @@ type App struct {
 	restartAt       map[string]time.Time
 	hungSince       map[string]time.Time
 	manualStop      map[string]bool
+	autoRestart     autoRestartConfig
 	mu              sync.Mutex
+}
+
+type autoRestartConfig struct {
+	enabled  bool
+	clock    dayClock
+	lastDay  int
+	parseErr error
+}
+
+type dayClock struct {
+	hour int
+	min  int
+	sec  int
 }
 
 func New(cfg config.Config, logger *log.Logger, version string) *App {
@@ -50,6 +65,7 @@ func New(cfg config.Config, logger *log.Logger, version string) *App {
 		hungSince:       make(map[string]time.Time),
 		manualStop:      make(map[string]bool),
 	}
+	app.applyAutoRestartSettings(cfg)
 	if err := process.SetNetworkConfig(cfg.Settings.UseETWNetwork); err != nil {
 		logger.Printf("%s ETW network disabled: %v", LogTag, err)
 	}
@@ -70,7 +86,9 @@ func (a *App) Run(ctx context.Context) error {
 
 	hideCursor()
 
-	statuses := a.computeStatuses(true, time.Now())
+	now := time.Now()
+	a.maybeAutoRestart(now)
+	statuses := a.computeStatuses(true, now)
 	a.render(statuses)
 
 	checkTicker := time.NewTicker(a.cfg.Settings.CheckTiming.Duration)
@@ -84,10 +102,14 @@ func (a *App) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-checkTicker.C:
-			statuses := a.computeStatuses(false, time.Now())
+			now := time.Now()
+			a.maybeAutoRestart(now)
+			statuses := a.computeStatuses(false, now)
 			a.render(statuses)
 		case <-restartTicker.C:
-			a.computeStatuses(true, time.Now())
+			now := time.Now()
+			a.maybeAutoRestart(now)
+			a.computeStatuses(true, now)
 		}
 	}
 }
@@ -108,6 +130,7 @@ func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot
 	}
 
 	now := time.Now()
+	a.maybeAutoRestart(now)
 	statuses := a.computeStatuses(true, now)
 	netDbg := ""
 	if a.cfg.Settings.NetDebug {
@@ -127,6 +150,7 @@ func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot
 			return ctx.Err()
 		case <-checkTicker.C:
 			now := time.Now()
+			a.maybeAutoRestart(now)
 			statuses := a.computeStatuses(false, now)
 			netDbg := ""
 			if a.cfg.Settings.NetDebug {
@@ -135,6 +159,7 @@ func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot
 			onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg))
 		case <-restartTicker.C:
 			now := time.Now()
+			a.maybeAutoRestart(now)
 			statuses := a.computeStatuses(true, now)
 			netDbg := ""
 			if a.cfg.Settings.NetDebug {
@@ -472,6 +497,7 @@ func (a *App) UpdateConfig(cfg config.Config) {
 	a.restartAt = make(map[string]time.Time)
 	a.hungSince = make(map[string]time.Time)
 	a.manualStop = make(map[string]bool)
+	a.applyAutoRestartSettings(cfg)
 	if err := process.SetNetworkConfig(cfg.Settings.UseETWNetwork); err != nil {
 		a.logger.Printf("%s ETW network disabled: %v", LogTag, err)
 	}
@@ -814,6 +840,89 @@ func buildExeTarget(item *config.ProcessItem, namesToCheck []string) string {
 		return strings.Join(namesToCheck, ", ")
 	}
 	return item.Process
+}
+
+func (a *App) applyAutoRestartSettings(cfg config.Config) {
+	a.autoRestart.enabled = cfg.Settings.AutoRestart
+	a.autoRestart.lastDay = 0
+	a.autoRestart.parseErr = nil
+	a.autoRestart.clock = dayClock{}
+	if !a.autoRestart.enabled {
+		return
+	}
+	clock, err := parseDayClock(cfg.Settings.AutoRestartTime)
+	if err != nil {
+		a.autoRestart.parseErr = err
+		return
+	}
+	a.autoRestart.clock = clock
+}
+
+func (a *App) maybeAutoRestart(now time.Time) {
+	a.mu.Lock()
+	enabled := a.autoRestart.enabled
+	parseErr := a.autoRestart.parseErr
+	clock := a.autoRestart.clock
+	lastDay := a.autoRestart.lastDay
+	a.mu.Unlock()
+	if !enabled {
+		return
+	}
+	if parseErr != nil {
+		a.logger.Printf("%s autorestart disabled: %v", LogTag, parseErr)
+		a.mu.Lock()
+		a.autoRestart.enabled = false
+		a.mu.Unlock()
+		return
+	}
+	today := dateKey(now)
+	if lastDay == today {
+		return
+	}
+	target := time.Date(now.Year(), now.Month(), now.Day(), clock.hour, clock.min, clock.sec, 0, now.Location())
+	if now.Before(target) {
+		return
+	}
+	if err := a.RestartAll(); err != nil {
+		a.logger.Printf("%s autorestart error: %v", LogTag, err)
+	}
+	a.mu.Lock()
+	a.autoRestart.lastDay = today
+	a.mu.Unlock()
+}
+
+func parseDayClock(raw string) (dayClock, error) {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return dayClock{}, fmt.Errorf("autoRestartTime is empty")
+	}
+	parts := strings.Split(s, ":")
+	if len(parts) != 2 && len(parts) != 3 {
+		return dayClock{}, fmt.Errorf("autoRestartTime must be HH:MM or HH:MM:SS")
+	}
+	h, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+	if err != nil {
+		return dayClock{}, fmt.Errorf("autoRestartTime hour invalid")
+	}
+	m, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if err != nil {
+		return dayClock{}, fmt.Errorf("autoRestartTime minute invalid")
+	}
+	sec := 0
+	if len(parts) == 3 {
+		sec, err = strconv.Atoi(strings.TrimSpace(parts[2]))
+		if err != nil {
+			return dayClock{}, fmt.Errorf("autoRestartTime second invalid")
+		}
+	}
+	if h < 0 || h > 23 || m < 0 || m > 59 || sec < 0 || sec > 59 {
+		return dayClock{}, fmt.Errorf("autoRestartTime out of range")
+	}
+	return dayClock{hour: h, min: m, sec: sec}, nil
+}
+
+func dateKey(t time.Time) int {
+	return t.Year()*10000 + int(t.Month())*100 + t.Day()
 }
 
 func isAnyProcessHung(names []string) bool {
