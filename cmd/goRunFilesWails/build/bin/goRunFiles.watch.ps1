@@ -1,6 +1,6 @@
 param(
     [string]$ExePath = 'D:\dev\www\goRunFiles\cmd\goRunFilesWails\build\bin\goRunFiles.exe',
-    [int]$RestartOnExit = 0
+    [int]$RestartOnExit = 1
 )
 $ErrorActionPreference = 'Stop'
 if (-not (Test-Path -LiteralPath $ExePath)) { exit 2 }

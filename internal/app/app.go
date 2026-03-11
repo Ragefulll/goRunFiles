@@ -227,22 +227,44 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 				status.Err = pathErr
 			}
 			namesToCheck = parseProcessList(item.Process, item.CheckProcess)
-			for _, procName := range namesToCheck {
-				ok, pid, err := process.ByName(procName)
+			checkCmdline := strings.TrimSpace(item.CheckCmdline)
+			if checkCmdline != "" {
+				checkName := strings.TrimSpace(item.CheckProcess)
+				if checkName == "" {
+					checkName = item.Process
+				}
+				ok, pid, err := process.ByNameAndCmdlineArgsExactWithExclude(checkName, checkCmdline, item.CheckCmdlineExclude)
 				if err != nil {
 					status.Err = err.Error()
 				}
-				if ok {
-					alive = true
-					if pid > 0 {
-						item.Pid = pid
+				alive = ok
+				if pid > 0 {
+					item.Pid = pid
+				}
+			} else {
+				namesToCheck = parseProcessList(item.Process, item.CheckProcess)
+				for _, procName := range namesToCheck {
+					ok, pid, err := process.ByName(procName)
+					if err != nil {
+						status.Err = err.Error()
 					}
-					break
+					if ok {
+						alive = true
+						if pid > 0 {
+							item.Pid = pid
+						}
+						break
+					}
 				}
 			}
 			status.Target = buildExeTarget(item, namesToCheck)
 			if alive && item.MonitorHang && item.HangTimeout.Duration > 0 {
-				hung := isAnyProcessHung(namesToCheck)
+				hung := false
+				if strings.TrimSpace(item.CheckCmdline) != "" {
+					hung = isProcessHung(item.Pid)
+				} else {
+					hung = isAnyProcessHung(namesToCheck)
+				}
 				status.Hung = hung
 				if hung {
 					if _, ok := a.hungSince[name]; !ok {
@@ -362,7 +384,10 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 				metricsPid = preferShippingPid(namesToCheck, status.Pid)
 			}
 			if metricsPid > 0 {
-				namesCopy := append([]string(nil), namesToCheck...)
+				var namesCopy []string
+				if strings.TrimSpace(item.CheckCmdline) == "" {
+					namesCopy = append([]string(nil), namesToCheck...)
+				}
 				metricTasks = append(metricTasks, metricTask{
 					idx:   len(statuses),
 					typ:   status.Type,
@@ -968,9 +993,19 @@ func stopProcessItem(item *config.ProcessItem) error {
 				lastErr = err
 			}
 		}
-		names := parseProcessList(item.Process, item.CheckProcess)
-		if err := process.KillByNames(names); err != nil {
-			lastErr = err
+		if strings.TrimSpace(item.CheckCmdline) != "" {
+			checkName := strings.TrimSpace(item.CheckProcess)
+			if checkName == "" {
+				checkName = item.Process
+			}
+			if err := process.KillByNameAndCmdlineArgsExactWithExclude(checkName, item.CheckCmdline, item.CheckCmdlineExclude); err != nil {
+				lastErr = err
+			}
+		} else {
+			names := parseProcessList(item.Process, item.CheckProcess)
+			if err := process.KillByNames(names); err != nil {
+				lastErr = err
+			}
 		}
 		item.Pid = 0
 		return lastErr
@@ -1005,6 +1040,21 @@ func stopProcessItem(item *config.ProcessItem) error {
 func isProcessItemAlive(item *config.ProcessItem) (bool, int, error) {
 	switch item.Type {
 	case config.TypeExe:
+		checkCmdline := strings.TrimSpace(item.CheckCmdline)
+		if checkCmdline != "" {
+			checkName := strings.TrimSpace(item.CheckProcess)
+			if checkName == "" {
+				checkName = item.Process
+			}
+			ok, pid, err := process.ByNameAndCmdlineArgsExactWithExclude(checkName, checkCmdline, item.CheckCmdlineExclude)
+			if err != nil {
+				return false, 0, err
+			}
+			if ok {
+				return true, pid, nil
+			}
+			return false, 0, nil
+		}
 		names := parseProcessList(item.Process, item.CheckProcess)
 		var lastErr error
 		for _, procName := range names {
