@@ -515,6 +515,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 func (a *App) UpdateConfig(cfg config.Config) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	oldManualStop := a.manualStop
 	a.cfg = cfg
 	a.last = make(map[string]Status)
 	a.defaultDisabled = buildDefaultDisabledMap(cfg)
@@ -522,6 +523,11 @@ func (a *App) UpdateConfig(cfg config.Config) {
 	a.restartAt = make(map[string]time.Time)
 	a.hungSince = make(map[string]time.Time)
 	a.manualStop = make(map[string]bool)
+	for name := range cfg.Process {
+		if oldManualStop[name] {
+			a.manualStop[name] = true
+		}
+	}
 	a.applyAutoRestartSettings(cfg)
 	if err := process.SetNetworkConfig(cfg.Settings.UseETWNetwork); err != nil {
 		a.logger.Printf("%s ETW network disabled: %v", LogTag, err)
