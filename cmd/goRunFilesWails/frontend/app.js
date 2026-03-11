@@ -195,8 +195,9 @@ const render = (data) => {
     const prev = prevMap.get(it.name) || {};
     const tr = document.createElement("tr");
     if (it.hung) tr.classList.add("hung");
-    if (it.status === "disabled") tr.classList.add("row-disabled");
+    if (it.status === "disabled" || it.disabled) tr.classList.add("row-disabled");
     const canStart = it.status !== "running" && it.status !== "started";
+    const isDisabled = !!it.disabled;
 
     const cpuVal = parseFloat(it.cpu || "0") || 0;
     const gpuVal = parseFloat(it.gpu || "0") || 0;
@@ -264,6 +265,9 @@ const render = (data) => {
       </td>
       <td>${it.target || ""}</td>
       <td>
+        <label class="action-toggle" title="Disabled">
+          <input class="action-switch" type="checkbox" data-action="toggle-disabled" data-name="${it.name}" ${isDisabled ? "checked" : ""} />
+        </label>
         <button data-action="open-folder" data-name="${it.name}" title="Open folder">📁</button>
         <button data-action="start" data-name="${it.name}" ${canStart ? "" : "disabled"}>▶️</button>
         <button data-action="stop" data-name="${it.name}">❌</button>
@@ -345,6 +349,36 @@ tbody.addEventListener("click", async (e) => {
     if (action === "restart") await api.Restart(name);
   } catch (err) {
     console.error(err);
+  }
+});
+
+tbody.addEventListener("change", async (e) => {
+  const el = e.target;
+  if (!el || !api) return;
+  if (el.dataset.action !== "toggle-disabled") return;
+  const name = el.dataset.name;
+  const disabled = !!el.checked;
+  const prev = !disabled;
+  el.disabled = true;
+  try {
+    const model = await api.GetConfigModel();
+    if (!model || !Array.isArray(model.processes)) {
+      throw new Error("Config load failed");
+    }
+    for (const p of model.processes) {
+      if (p.name === name) {
+        p.disabled = disabled;
+        break;
+      }
+    }
+    await api.SaveConfigModel(model);
+    await tick();
+  } catch (err) {
+    console.error(err);
+    el.checked = prev;
+    alert(err.message || String(err));
+  } finally {
+    el.disabled = false;
   }
 });
 

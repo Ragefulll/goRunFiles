@@ -209,10 +209,10 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 	for _, name := range names {
 		item := a.cfg.Process[name]
 		status := procStatus{
-			Name: name,
-			Type: item.Type,
+			Name:     name,
+			Type:     item.Type,
+			Disabled: item.Disabled,
 		}
-		var namesToCheck []string
 		if item.Disabled {
 			status.Status = StatusDisabled
 			status.Err = ""
@@ -220,6 +220,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			continue
 		}
 
+		var namesToCheck []string
 		var alive bool
 		switch item.Type {
 		case config.TypeExe:
@@ -689,6 +690,7 @@ type procStatus struct {
 	Name      string
 	Type      string
 	Status    Status
+	Disabled  bool
 	Target    string
 	Pid       int
 	StartedAt string

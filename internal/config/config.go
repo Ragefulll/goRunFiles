@@ -60,8 +60,16 @@ type Config struct {
 func Load(path string) (Config, error) {
 	var cfg Config
 	if err := gcfg.ReadFileInto(&cfg, path); err != nil {
+		if _, repErr := RepairFile(path); repErr == nil {
+			if err2 := gcfg.ReadFileInto(&cfg, path); err2 == nil {
+				goto loaded
+			} else {
+				return Config{}, err2
+			}
+		}
 		return Config{}, err
 	}
+loaded:
 	if data, err := os.ReadFile(path); err == nil {
 		lower := bytes.ToLower(data)
 		if !bytes.Contains(lower, []byte("autorestartonexit")) {

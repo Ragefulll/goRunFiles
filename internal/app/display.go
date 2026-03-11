@@ -11,6 +11,7 @@ type DisplayStatus struct {
 	Name      string `json:"name"`
 	Type      string `json:"type"`
 	Status    string `json:"status"`
+	Disabled  bool   `json:"disabled"`
 	Icon      string `json:"icon"`
 	Pid       string `json:"pid"`
 	StartedAt string `json:"started_at"`
@@ -47,6 +48,7 @@ func buildDisplaySnapshot(version string, statuses []procStatus, now time.Time, 
 			Name:      s.Name,
 			Type:      s.Type,
 			Status:    string(s.Status),
+			Disabled:  s.Disabled,
 			Icon:      s.Status.Icon(),
 			Pid:       s.pidString(),
 			StartedAt: s.StartedAt,

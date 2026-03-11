@@ -200,7 +200,7 @@ try {
 $obj | ConvertTo-Json -Compress
 `, schedulerTaskName, schedulerTaskName)
 
-	out, err := exec.Command("powershell", "-NoProfile", "-Command", ps).Output()
+	out, err := exec.Command("powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps).Output()
 	if err != nil {
 		return schedulerQuery{}, fmt.Errorf("query scheduler: %w", err)
 	}

@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"embed"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 
 	"goRunFiles/internal/app"
@@ -54,7 +56,7 @@ func main() {
 
 	err = wails.Run(&options.App{
 		Title:  "ART3D Process Monitor",
-		Width:  1950,
+		Width:  2050,
 		Height: 900,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
@@ -132,6 +134,32 @@ func (g *GUI) Stop(name string) error {
 // Restart restarts a process by config name.
 func (g *GUI) Restart(name string) error {
 	return g.mon.RestartProcess(name)
+}
+
+// SetDisabled enables or disables a process by config name.
+func (g *GUI) SetDisabled(name string, disabled bool) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("process name is empty")
+	}
+	cfg, err := config.Load(g.configPath)
+	if err != nil {
+		return err
+	}
+	item, ok := cfg.Process[name]
+	if !ok {
+		return fmt.Errorf("process %q not found", name)
+	}
+	item.Disabled = disabled
+	dto := config.ToDTO(cfg)
+	if err := config.WriteFromDTO(g.configPath, dto); err != nil {
+		return err
+	}
+	g.mon.UpdateConfig(cfg)
+	if err := updateSchedulerScriptIfInstalled(cfg); err != nil {
+		return err
+	}
+	return nil
 }
 
 // RestartAll restarts all enabled processes.

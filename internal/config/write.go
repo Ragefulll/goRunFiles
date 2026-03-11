@@ -93,7 +93,7 @@ func quoteIfNeeded(s string) string {
 	}
 	need := false
 	for _, r := range s {
-		if r == ' ' || r == '\\' || r == '"' || r == ',' {
+		if r == ' ' || r == '"' || r == ',' {
 			need = true
 			break
 		}
@@ -101,6 +101,7 @@ func quoteIfNeeded(s string) string {
 	if !need {
 		return s
 	}
-	escaped := strings.ReplaceAll(s, `"`, `\"`)
+	escaped := strings.ReplaceAll(s, `\`, `\\`)
+	escaped = strings.ReplaceAll(escaped, `"`, `\"`)
 	return `"` + escaped + `"`
 }
