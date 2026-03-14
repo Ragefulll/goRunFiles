@@ -30,6 +30,12 @@ go run github.com/Velocidex/etw/examples/tracer@latest -events network -kernel_e
 ```
 
 ## Usage
+🖥️ **Запуск WEB версии, для вёрстки:**
+```
+cd cmd\goRunFilesWails
+wails dev -browser
+```
+
 🖥️ **Запуск:**
 ```.\run.ps1```
 
