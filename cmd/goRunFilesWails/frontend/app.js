@@ -1,5 +1,8 @@
 const api = window.go?.main?.GUI;
 
+const textSizeDebug = document.getElementsByClassName('textSizeDebug')?.[0];
+const html = document.getElementsByTagName('html')?.[0];
+let   fontSizeHtml = '10px';
 const elUpdated = document.getElementById("updated");
 const elVersion = document.getElementById("version");
 const elNetStatus = document.getElementById("netStatus");
@@ -226,7 +229,24 @@ const render = (data) => {
     const netDisplay = netIsMB ? netVal.toFixed(2) : netVal.toFixed(0);
     const ioDisplay = netIsMB ? ioVal.toFixed(2) : ioVal.toFixed(0);
 
+    const windowSize = html?.getBoundingClientRect();
+    const needFontSize = `${(windowSize.width / 2050) * 10}px`;
+    if (needFontSize !== fontSizeHtml) {
+      fontSizeHtml = needFontSize;
+      textSizeDebug.innerHTML = `${windowSize.width}x${windowSize.height}`;
+      html.style['font-size'] = fontSizeHtml;
+    }
+
     tr.innerHTML = `
+      <td>
+        <label class="action-toggle" title="Disabled">
+          <input class="action-switch" type="checkbox" data-action="toggle-disabled" data-name="${it.name}" ${isDisabled ? "checked" : ""} />
+        </label>
+        <button data-action="open-folder" data-name="${it.name}" title="Open folder">📁</button>
+        <button data-action="restart" data-name="${it.name}">🔄️</button>
+        <button data-action="stop" data-name="${it.name}">❌</button>
+        <button data-action="start" data-name="${it.name}" ${canStart ? "" : "disabled"}>▶️</button>
+      </td>
       <td>${it.name || ""}</td>
       <td>${it.type || ""}</td>
       <td class="status ${it.status || ""}">${it.icon || ""}</td>
@@ -264,15 +284,6 @@ const render = (data) => {
         </div>
       </td>
       <td>${it.target || ""}</td>
-      <td>
-        <label class="action-toggle" title="Disabled">
-          <input class="action-switch" type="checkbox" data-action="toggle-disabled" data-name="${it.name}" ${isDisabled ? "checked" : ""} />
-        </label>
-        <button data-action="open-folder" data-name="${it.name}" title="Open folder">📁</button>
-        <button data-action="start" data-name="${it.name}" ${canStart ? "" : "disabled"}>▶️</button>
-        <button data-action="stop" data-name="${it.name}">❌</button>
-        <button data-action="restart" data-name="${it.name}">🔄️</button>
-      </td>
     `;
     tbody.appendChild(tr);
 
