@@ -12,6 +12,14 @@
   font-synthesis: none;
 }
 
+html {
+  transition: font-size 220ms ease;
+  will-change: font-size, transform;
+}
+html.font-size-anim {
+  animation: fontSizeShift 220ms ease;
+}
+
 @font-face {
   font-family: "bahnschrift";
   src: url("fonts/bahnschrift.ttf") format("opentype");
@@ -267,6 +275,11 @@ label input, .config-panel input[type="text"], .config-panel input[type="number"
   0% { transform: scale(1); }
   50% { transform: scale(1.1); }
   100% { transform: scale(1); }
+}
+
+@keyframes fontSizeShift {
+  0% { transform: translate3d(0, 0.4rem, 0); }
+  100% { transform: translate3d(0, 0, 0); }
 }
 
 .config-panel h3 { margin: 1.2rem 0 0.8rem 0; font-size: 1.3rem; color: var(--muted); }

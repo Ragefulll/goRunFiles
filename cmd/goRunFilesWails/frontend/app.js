@@ -54,11 +54,16 @@ const HISTORY_LEN = 40;
 const metricHistory = new Map();
 let sparkSeq = 0;
 const ANIM_DURATION_MS = 320;
+const MIN_TICK_MS = 100;
 const ERROR_LOG_MAX = 600;
 const errorLogLines = [];
 const lastErrorByProcess = new Map();
 let consoleOpened = false;
 const CMD_CHECK_CMDLINE_EXCLUDE_DEFAULT = "jetbrains,js-language-service,typingsinstaller,eslint";
+let tickIntervalMs = 500;
+let tickTimer = null;
+let tickInFlight = false;
+let fontAnimTimer = null;
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
@@ -136,6 +141,19 @@ const animateNumber = (el, from, to, format, duration = ANIM_DURATION_MS) => {
   requestAnimationFrame(step);
 };
 
+const triggerFontSizeAnim = () => {
+  if (!html) return;
+  html.classList.remove("font-size-anim");
+  void html.offsetWidth;
+  html.classList.add("font-size-anim");
+  if (fontAnimTimer) {
+    clearTimeout(fontAnimTimer);
+  }
+  fontAnimTimer = setTimeout(() => {
+    html.classList.remove("font-size-anim");
+  }, 260);
+};
+
 const appendErrorLog = (line) => {
   if (!line) return;
   errorLogLines.unshift(line);
@@ -185,12 +203,26 @@ const render = (data) => {
   }
   collectErrorLog(data);
   const netUnit = (data.net_unit || "KB").toUpperCase();
-  tbody.innerHTML = "";
+  const netIsMB = netUnit === "MB";
+  const frag = document.createDocumentFragment();
 
   const prevMap = new Map();
   if (lastSnapshot && Array.isArray(lastSnapshot.items)) {
     for (const it of lastSnapshot.items) {
       prevMap.set(it.name, it);
+    }
+  }
+
+  const windowSize = html?.getBoundingClientRect();
+  if (windowSize) {
+    const needFontSize = `${(windowSize.width / 2050) * 11}px`;
+    if (needFontSize !== fontSizeHtml) {
+      fontSizeHtml = needFontSize;
+      if (textSizeDebug) {
+        textSizeDebug.innerHTML = `${windowSize.width}x${windowSize.height}`;
+      }
+      html.style["font-size"] = fontSizeHtml;
+      triggerFontSizeAnim();
     }
   }
 
@@ -207,8 +239,6 @@ const render = (data) => {
     const memVal = parseFloat(it.mem_mb || "0") || 0;
     const netVal = parseFloat(it.net_kbs || "0") || 0;
     const ioVal = parseFloat(it.io_kbs || "0") || 0;
-    const netUnitUpper = (data.net_unit || "KB").toUpperCase();
-    const netIsMB = netUnitUpper === "MB";
     const netKBVal = netIsMB ? netVal * 1024 : netVal;
     const netMBVal = netIsMB ? netVal : netVal / 1024;
     const ioKBVal = netIsMB ? ioVal * 1024 : ioVal;
@@ -228,14 +258,6 @@ const render = (data) => {
 
     const netDisplay = netIsMB ? netVal.toFixed(2) : netVal.toFixed(0);
     const ioDisplay = netIsMB ? ioVal.toFixed(2) : ioVal.toFixed(0);
-
-    const windowSize = html?.getBoundingClientRect();
-    const needFontSize = `${(windowSize.width / 2050) * 10}px`;
-    if (needFontSize !== fontSizeHtml) {
-      fontSizeHtml = needFontSize;
-      textSizeDebug.innerHTML = `${windowSize.width}x${windowSize.height}`;
-      html.style['font-size'] = fontSizeHtml;
-    }
 
     tr.innerHTML = `
       <td>
@@ -285,7 +307,7 @@ const render = (data) => {
       </td>
       <td>${it.target || ""}</td>
     `;
-    tbody.appendChild(tr);
+    frag.appendChild(tr);
 
     const prevPid = Number(prev.pid);
     const prevCpu = parseFloat(prev.cpu || "0");
@@ -339,6 +361,7 @@ const render = (data) => {
     );
   }
 
+  tbody.replaceChildren(frag);
   lastSnapshot = data;
 };
 
@@ -346,6 +369,9 @@ const tick = async () => {
   if (!api) return;
   const data = await api.GetSnapshot();
   render(data);
+  if (data && Number.isFinite(data.check_timing_ms) && data.check_timing_ms > 0) {
+    tickIntervalMs = Math.max(MIN_TICK_MS, data.check_timing_ms);
+  }
 };
 
 tbody.addEventListener("click", async (e) => {
@@ -581,7 +607,30 @@ toggleBtn.addEventListener("click", () => {
   openAuthModal();
 });
 
-setInterval(tick, 500);
+const scheduleTick = (delayMs) => {
+  if (tickTimer) {
+    clearTimeout(tickTimer);
+  }
+  tickTimer = setTimeout(runTick, delayMs);
+};
+
+const runTick = async () => {
+  if (tickInFlight || !api) {
+    scheduleTick(tickIntervalMs);
+    return;
+  }
+  tickInFlight = true;
+  const start = performance.now();
+  try {
+    await tick();
+  } finally {
+    tickInFlight = false;
+    const elapsed = performance.now() - start;
+    const delay = Math.max(0, tickIntervalMs - elapsed);
+    scheduleTick(delay);
+  }
+};
+
 window.onload = async () => {
   await tick();
   if (api) {
@@ -594,6 +643,7 @@ window.onload = async () => {
   lockConfig();
   configPanel.classList.add("hidden");
   document.querySelector(".config-actions").classList.add("hidden");
+  scheduleTick(tickIntervalMs);
 };
 
 addProcessBtn.addEventListener("click", () => {

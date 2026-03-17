@@ -43,6 +43,28 @@ func MemoryMB(pid int) int {
 	return int(mem.RSS / (1024 * 1024))
 }
 
+// CPUAndMem returns CPU percentage and memory usage in MB for a PID.
+func CPUAndMem(pid int) (float64, int) {
+	if pid <= 0 {
+		return 0, 0
+	}
+	p, err := process.NewProcess(int32(pid))
+	if err != nil {
+		return 0, 0
+	}
+	now := time.Now()
+	var cpu float64
+	if times, err := p.Times(); err == nil {
+		total := times.User + times.System
+		cpu = cpuPercentFromSample(pid, now, total)
+	}
+	var memMB int
+	if mem, err := p.MemoryInfo(); err == nil {
+		memMB = int(mem.RSS / (1024 * 1024))
+	}
+	return cpu, memMB
+}
+
 type cpuSample struct {
 	at    time.Time
 	total float64
@@ -134,6 +156,52 @@ func NetKBs(pid int) float64 {
 	// No ETW => no reliable per-process network counters in this mode.
 	_ = netRateFromSample(pid, now, 0)
 	return 0
+}
+
+// NetIOKBs returns approximate network and I/O throughput in KB/s for a PID.
+func NetIOKBs(pid int) (float64, float64) {
+	if pid <= 0 {
+		return 0, 0
+	}
+	now := time.Now()
+	pids := processTreePIDs(pid)
+	if len(pids) == 0 {
+		return 0, 0
+	}
+
+	var netRate float64
+	if useETWNetwork.Load() && isETWActive() {
+		var etwTotal uint64
+		var hasETW bool
+		for _, p := range pids {
+			if total, ok := etwTotalBytes(p); ok {
+				etwTotal += total
+				hasETW = true
+			}
+		}
+		if hasETW {
+			netRate = applyNetScale(netRateFromSample(pid, now, etwTotal))
+		} else {
+			_ = netRateFromSample(pid, now, 0)
+		}
+	} else {
+		_ = netRateFromSample(pid, now, 0)
+	}
+
+	var totalBytes uint64
+	for _, p := range pids {
+		proc, err := process.NewProcess(int32(p))
+		if err != nil {
+			continue
+		}
+		io, err := proc.IOCounters()
+		if err != nil {
+			continue
+		}
+		totalBytes += io.ReadBytes + io.WriteBytes
+	}
+	ioRate := applyNetScale(ioRateFromSample(pid, now, totalBytes))
+	return netRate, ioRate
 }
 
 func netRateFromSample(pid int, now time.Time, total uint64) float64 {

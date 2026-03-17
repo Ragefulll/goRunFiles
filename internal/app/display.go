@@ -31,6 +31,7 @@ type DisplayStatus struct {
 type DisplaySnapshot struct {
 	Updated string          `json:"updated"`
 	Version string          `json:"version"`
+	CheckTimingMs int       `json:"check_timing_ms"`
 	NetUnit string          `json:"net_unit"`
 	NetMode string          `json:"net_mode"`
 	NetErr  string          `json:"net_err"`
@@ -38,7 +39,7 @@ type DisplaySnapshot struct {
 	Items   []DisplayStatus `json:"items"`
 }
 
-func buildDisplaySnapshot(version string, statuses []procStatus, now time.Time, netUnit, netMode, netErr, netDbg string) DisplaySnapshot {
+func buildDisplaySnapshot(version string, statuses []procStatus, now time.Time, checkTiming time.Duration, netUnit, netMode, netErr, netDbg string) DisplaySnapshot {
 	if strings.TrimSpace(netUnit) == "" {
 		netUnit = "KB"
 	}
@@ -65,13 +66,14 @@ func buildDisplaySnapshot(version string, statuses []procStatus, now time.Time, 
 		})
 	}
 	return DisplaySnapshot{
-		Updated: now.Format("2006-01-02 15:04:05"),
-		Version: version,
-		NetUnit: netUnit,
-		NetMode: netMode,
-		NetErr:  netErr,
-		NetDbg:  netDbg,
-		Items:   items,
+		Updated:        now.Format("2006-01-02 15:04:05"),
+		Version:        version,
+		CheckTimingMs:  int(checkTiming / time.Millisecond),
+		NetUnit:        netUnit,
+		NetMode:        netMode,
+		NetErr:         netErr,
+		NetDbg:         netDbg,
+		Items:          items,
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -136,7 +137,7 @@ func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot
 	if a.cfg.Settings.NetDebug {
 		netDbg = process.NetDebug()
 	}
-	onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg))
+	onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.CheckTiming.Duration, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg))
 
 	checkTicker := time.NewTicker(a.cfg.Settings.CheckTiming.Duration)
 	defer checkTicker.Stop()
@@ -156,7 +157,7 @@ func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot
 			if a.cfg.Settings.NetDebug {
 				netDbg = process.NetDebug()
 			}
-			onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg))
+			onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.CheckTiming.Duration, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg))
 		case <-restartTicker.C:
 			now := time.Now()
 			a.maybeAutoRestart(now)
@@ -165,7 +166,7 @@ func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot
 			if a.cfg.Settings.NetDebug {
 				netDbg = process.NetDebug()
 			}
-			onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg))
+			onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.CheckTiming.Duration, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg))
 		}
 	}
 }
@@ -446,7 +447,13 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 	}
 
 	if len(metricTasks) > 0 {
-		const maxMetricWorkers = 4
+		maxMetricWorkers := runtime.NumCPU()
+		if maxMetricWorkers < 4 {
+			maxMetricWorkers = 4
+		}
+		if len(metricTasks) < maxMetricWorkers {
+			maxMetricWorkers = len(metricTasks)
+		}
 		sem := make(chan struct{}, maxMetricWorkers)
 		results := make(chan metricResult, len(metricTasks))
 		var wg sync.WaitGroup
@@ -459,15 +466,16 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 				sem <- struct{}{}
 				defer func() { <-sem }()
 
+				cpu, memMB := process.CPUAndMem(task.pid)
+				netByPID, ioByPID := process.NetIOKBs(task.pid)
 				res := metricResult{
 					idx:   task.idx,
-					cpu:   process.CPUPercent(task.pid),
-					memMB: process.MemoryMB(task.pid),
+					cpu:   cpu,
+					memMB: memMB,
 				}
 
 				if task.typ == config.TypeExe && len(task.names) > 0 {
 					netByNames := process.NetKBsByNames(task.names)
-					netByPID := process.NetKBs(task.pid)
 					if netByNames > netByPID {
 						res.netKBs = netByNames
 					} else {
@@ -475,15 +483,14 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 					}
 
 					ioByNames := process.IOKBsByNames(task.names)
-					ioByPID := process.IOKBs(task.pid)
 					if ioByNames > ioByPID {
 						res.ioKBs = ioByNames
 					} else {
 						res.ioKBs = ioByPID
 					}
 				} else {
-					res.netKBs = process.NetKBs(task.pid)
-					res.ioKBs = process.IOKBs(task.pid)
+					res.netKBs = netByPID
+					res.ioKBs = ioByPID
 				}
 
 				if gpu, ok := gpuByPid[task.pid]; ok {
