@@ -64,6 +64,7 @@ let tickIntervalMs = 500;
 let tickTimer = null;
 let tickInFlight = false;
 let fontAnimTimer = null;
+const rowMap = new Map();
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
@@ -188,6 +189,218 @@ const collectErrorLog = (data) => {
   }
 };
 
+const createRow = (name) => {
+  const tr = document.createElement("tr");
+  tr.dataset.name = name;
+
+  const tdActions = document.createElement("td");
+  const label = document.createElement("label");
+  label.className = "action-toggle";
+  label.title = "Disabled";
+  const checkbox = document.createElement("input");
+  checkbox.className = "action-switch";
+  checkbox.type = "checkbox";
+  checkbox.dataset.action = "toggle-disabled";
+  checkbox.dataset.name = name;
+  label.appendChild(checkbox);
+  tdActions.appendChild(label);
+
+  const btnFolder = document.createElement("button");
+  btnFolder.dataset.action = "open-folder";
+  btnFolder.dataset.name = name;
+  btnFolder.title = "Open folder";
+  btnFolder.textContent = "📁";
+  tdActions.appendChild(btnFolder);
+
+  const btnRestart = document.createElement("button");
+  btnRestart.dataset.action = "restart";
+  btnRestart.dataset.name = name;
+  btnRestart.textContent = "🔄️";
+  tdActions.appendChild(btnRestart);
+
+  const btnStop = document.createElement("button");
+  btnStop.dataset.action = "stop";
+  btnStop.dataset.name = name;
+  btnStop.textContent = "❌";
+  tdActions.appendChild(btnStop);
+
+  const btnStart = document.createElement("button");
+  btnStart.dataset.action = "start";
+  btnStart.dataset.name = name;
+  btnStart.textContent = "▶️";
+  tdActions.appendChild(btnStart);
+
+  const tdName = document.createElement("td");
+  const tdType = document.createElement("td");
+  const tdStatus = document.createElement("td");
+  tdStatus.className = "status";
+
+  const tdPid = document.createElement("td");
+  const pidSpan = document.createElement("span");
+  pidSpan.className = "anim-number anim-pid";
+  tdPid.appendChild(pidSpan);
+
+  const tdStarted = document.createElement("td");
+  const tdUptime = document.createElement("td");
+
+  const makeMetricCell = (className) => {
+    const td = document.createElement("td");
+    td.className = "metric";
+    const wrap = document.createElement("div");
+    wrap.className = "metric-wrap";
+    const val = document.createElement("span");
+    val.className = `metric-val anim-number ${className}`;
+    const spark = document.createElement("div");
+    spark.className = "spark-wrap";
+    wrap.appendChild(val);
+    wrap.appendChild(spark);
+    td.appendChild(wrap);
+    return { td, val, spark };
+  };
+
+  const cpuCell = makeMetricCell("anim-cpu");
+  const gpuCell = makeMetricCell("anim-gpu");
+  const memCell = makeMetricCell("anim-ram");
+  const netCell = makeMetricCell("anim-net");
+  const ioCell = makeMetricCell("anim-io");
+
+  const tdTarget = document.createElement("td");
+
+  tr.appendChild(tdActions);
+  tr.appendChild(tdName);
+  tr.appendChild(tdType);
+  tr.appendChild(tdStatus);
+  tr.appendChild(tdPid);
+  tr.appendChild(tdStarted);
+  tr.appendChild(tdUptime);
+  tr.appendChild(cpuCell.td);
+  tr.appendChild(gpuCell.td);
+  tr.appendChild(memCell.td);
+  tr.appendChild(netCell.td);
+  tr.appendChild(ioCell.td);
+  tr.appendChild(tdTarget);
+
+  return {
+    tr,
+    checkbox,
+    btnStart,
+    tdName,
+    tdType,
+    tdStatus,
+    pidSpan,
+    tdStarted,
+    tdUptime,
+    cpu: cpuCell,
+    gpu: gpuCell,
+    mem: memCell,
+    net: netCell,
+    io: ioCell,
+    tdTarget,
+  };
+};
+
+const updateRow = (row, it, prev, netUnit, netIsMB) => {
+  if (it.hung) row.tr.classList.add("hung");
+  else row.tr.classList.remove("hung");
+  if (it.status === "disabled" || it.disabled) row.tr.classList.add("row-disabled");
+  else row.tr.classList.remove("row-disabled");
+
+  row.checkbox.checked = !!it.disabled;
+  const canStart = it.status !== "running" && it.status !== "started";
+  row.btnStart.disabled = !canStart;
+
+  row.tdName.textContent = it.name || "";
+  row.tdType.textContent = it.type || "";
+  row.tdStatus.className = `status ${it.status || ""}`;
+  row.tdStatus.textContent = it.icon || "";
+
+  const pidNum = Number(it.pid);
+  const prevPid = Number(prev.pid);
+  if (Number.isFinite(pidNum) && pidNum > 0) {
+    animateNumber(
+      row.pidSpan,
+      Number.isFinite(prevPid) && prevPid > 0 ? prevPid : pidNum,
+      pidNum,
+      (v) => `${Math.max(0, Math.round(v))}`
+    );
+  } else {
+    row.pidSpan.textContent = "-";
+  }
+
+  row.tdStarted.textContent = it.started_at || "-";
+  row.tdUptime.textContent = it.uptime || "-";
+
+  const cpuVal = parseFloat(it.cpu || "0") || 0;
+  const gpuVal = parseFloat(it.gpu || "0") || 0;
+  const memVal = parseFloat(it.mem_mb || "0") || 0;
+  const netVal = parseFloat(it.net_kbs || "0") || 0;
+  const ioVal = parseFloat(it.io_kbs || "0") || 0;
+
+  const netKBVal = netIsMB ? netVal * 1024 : netVal;
+  const netMBVal = netIsMB ? netVal : netVal / 1024;
+  const ioKBVal = netIsMB ? ioVal * 1024 : ioVal;
+  const ioMBVal = netIsMB ? ioVal : ioVal / 1024;
+
+  pushMetric(it.name, cpuVal, gpuVal, memVal, netVal, ioVal);
+  const hist = metricHistory.get(it.name) || { cpu: [], gpu: [], mem: [], net: [], io: [] };
+  row.cpu.spark.innerHTML = buildSparkline(hist.cpu, "#67e8f9");
+  row.gpu.spark.innerHTML = buildSparkline(hist.gpu, "#fca5a5");
+  row.mem.spark.innerHTML = buildSparkline(hist.mem, "#a7f3d0");
+  row.net.spark.innerHTML = buildSparkline(hist.net, "#c4b5fd");
+  row.io.spark.innerHTML = buildSparkline(hist.io, "#f9d46b");
+
+  const netDisplay = netIsMB ? netVal.toFixed(2) : netVal.toFixed(0);
+  const ioDisplay = netIsMB ? ioVal.toFixed(2) : ioVal.toFixed(0);
+
+  const prevCpu = parseFloat(prev.cpu || "0");
+  const prevGpu = parseFloat(prev.gpu || "0");
+  const prevMem = parseFloat(prev.mem_mb || "0");
+  const prevNet = parseFloat(prev.net_kbs || "0");
+  const prevIo = parseFloat(prev.io_kbs || "0");
+
+  animateNumber(
+    row.cpu.val,
+    toFiniteOr(prevCpu, cpuVal),
+    cpuVal,
+    (v) => `${Math.max(0, Math.round(v))}%`
+  );
+  animateNumber(
+    row.gpu.val,
+    toFiniteOr(prevGpu, gpuVal),
+    gpuVal,
+    (v) => `${Math.max(0, Math.round(v))}%`
+  );
+  animateNumber(
+    row.mem.val,
+    toFiniteOr(prevMem, memVal),
+    memVal,
+    (v) => `${Math.max(0, v).toFixed(2)}MB`
+  );
+  animateNumber(
+    row.net.val,
+    toFiniteOr(prevNet, netVal),
+    netVal,
+    (v) => netIsMB
+      ? `${Math.max(0, v).toFixed(2)}${netUnit}`
+      : `${Math.max(0, Math.round(v))}${netUnit}`
+  );
+  animateNumber(
+    row.io.val,
+    toFiniteOr(prevIo, ioVal),
+    ioVal,
+    (v) => netIsMB
+      ? `${Math.max(0, v).toFixed(2)}${netUnit}`
+      : `${Math.max(0, Math.round(v))}${netUnit}`
+  );
+
+  row.net.td.title = `NET: ${netKBVal.toFixed(1)} KB/s | ${netMBVal.toFixed(2)} MB/s`;
+  row.io.td.title = `IO: ${ioKBVal.toFixed(1)} KB/s | ${ioMBVal.toFixed(2)} MB/s`;
+  row.gpu.td.title = `GPU memory: ${it.gpu_mem_mb || 0} MB`;
+  row.mem.td.title = `RAM: ${memVal.toFixed(2)} MB`;
+
+  row.tdTarget.textContent = it.target || "";
+};
+
 const render = (data) => {
   if (!data) return;
   elUpdated.textContent = data.updated || "—";
@@ -226,139 +439,26 @@ const render = (data) => {
     }
   }
 
+  const seen = new Set();
   for (const it of data.items || []) {
-    const prev = prevMap.get(it.name) || {};
-    const tr = document.createElement("tr");
-    if (it.hung) tr.classList.add("hung");
-    if (it.status === "disabled" || it.disabled) tr.classList.add("row-disabled");
-    const canStart = it.status !== "running" && it.status !== "started";
-    const isDisabled = !!it.disabled;
-
-    const cpuVal = parseFloat(it.cpu || "0") || 0;
-    const gpuVal = parseFloat(it.gpu || "0") || 0;
-    const memVal = parseFloat(it.mem_mb || "0") || 0;
-    const netVal = parseFloat(it.net_kbs || "0") || 0;
-    const ioVal = parseFloat(it.io_kbs || "0") || 0;
-    const netKBVal = netIsMB ? netVal * 1024 : netVal;
-    const netMBVal = netIsMB ? netVal : netVal / 1024;
-    const ioKBVal = netIsMB ? ioVal * 1024 : ioVal;
-    const ioMBVal = netIsMB ? ioVal : ioVal / 1024;
-    pushMetric(it.name, cpuVal, gpuVal, memVal, netVal, ioVal);
-    const hist = metricHistory.get(it.name) || { cpu: [], gpu: [], mem: [], net: [], io: [] };
-    const cpuSpark = buildSparkline(hist.cpu, "#67e8f9");
-    const gpuSpark = buildSparkline(hist.gpu, "#fca5a5");
-    const memSpark = buildSparkline(hist.mem, "#a7f3d0");
-    const netSpark = buildSparkline(hist.net, "#c4b5fd");
-    const ioSpark = buildSparkline(hist.io, "#f9d46b");
-
-    const pidNum = Number(it.pid);
-    const pidText = Number.isFinite(pidNum) && pidNum > 0
-      ? `<span class="anim-number anim-pid">${Math.round(pidNum)}</span>`
-      : "-";
-
-    const netDisplay = netIsMB ? netVal.toFixed(2) : netVal.toFixed(0);
-    const ioDisplay = netIsMB ? ioVal.toFixed(2) : ioVal.toFixed(0);
-
-    tr.innerHTML = `
-      <td>
-        <label class="action-toggle" title="Disabled">
-          <input class="action-switch" type="checkbox" data-action="toggle-disabled" data-name="${it.name}" ${isDisabled ? "checked" : ""} />
-        </label>
-        <button data-action="open-folder" data-name="${it.name}" title="Open folder">📁</button>
-        <button data-action="restart" data-name="${it.name}">🔄️</button>
-        <button data-action="stop" data-name="${it.name}">❌</button>
-        <button data-action="start" data-name="${it.name}" ${canStart ? "" : "disabled"}>▶️</button>
-      </td>
-      <td>${it.name || ""}</td>
-      <td>${it.type || ""}</td>
-      <td class="status ${it.status || ""}">${it.icon || ""}</td>
-      <td>${pidText}</td>
-      <td>${it.started_at || "-"}</td>
-      <td>${it.uptime || "-"}</td>
-      <td class="metric">
-        <div class="metric-wrap">
-          <span class="metric-val anim-number anim-cpu">${cpuVal.toFixed(0)}%</span>
-          ${cpuSpark}
-        </div>
-      </td>
-      <td class="metric" title="GPU memory: ${it.gpu_mem_mb || 0} MB">
-        <div class="metric-wrap">
-          <span class="metric-val anim-number anim-gpu">${gpuVal.toFixed(0)}%</span>
-          ${gpuSpark}
-        </div>
-      </td>
-      <td class="metric" title="RAM: ${memVal.toFixed(2)} MB">
-        <div class="metric-wrap">
-          <span class="metric-val anim-number anim-ram">${memVal.toFixed(2)}MB</span>
-          ${memSpark}
-        </div>
-      </td>
-      <td class="metric" title="NET: ${netKBVal.toFixed(1)} KB/s | ${netMBVal.toFixed(2)} MB/s">
-        <div class="metric-wrap">
-          <span class="metric-val anim-number anim-net">${netDisplay}${netUnit}</span>
-          ${netSpark}
-        </div>
-      </td>
-      <td class="metric" title="IO: ${ioKBVal.toFixed(1)} KB/s | ${ioMBVal.toFixed(2)} MB/s">
-        <div class="metric-wrap">
-          <span class="metric-val anim-number anim-io">${ioDisplay}${netUnit}</span>
-          ${ioSpark}
-        </div>
-      </td>
-      <td>${it.target || ""}</td>
-    `;
-    frag.appendChild(tr);
-
-    const prevPid = Number(prev.pid);
-    const prevCpu = parseFloat(prev.cpu || "0");
-    const prevGpu = parseFloat(prev.gpu || "0");
-    const prevMem = parseFloat(prev.mem_mb || "0");
-    const prevNet = parseFloat(prev.net_kbs || "0");
-    const prevIo = parseFloat(prev.io_kbs || "0");
-
-    const pidEl = tr.querySelector(".anim-pid");
-    if (pidEl && Number.isFinite(pidNum) && pidNum > 0) {
-      animateNumber(
-        pidEl,
-        Number.isFinite(prevPid) && prevPid > 0 ? prevPid : pidNum,
-        pidNum,
-        (v) => `${Math.max(0, Math.round(v))}`
-      );
+    const name = it.name || "";
+    if (!name) continue;
+    seen.add(name);
+    let row = rowMap.get(name);
+    if (!row) {
+      row = createRow(name);
+      rowMap.set(name, row);
     }
-    animateNumber(
-      tr.querySelector(".anim-cpu"),
-      toFiniteOr(prevCpu, cpuVal),
-      cpuVal,
-      (v) => `${Math.max(0, Math.round(v))}%`
-    );
-    animateNumber(
-      tr.querySelector(".anim-gpu"),
-      toFiniteOr(prevGpu, gpuVal),
-      gpuVal,
-      (v) => `${Math.max(0, Math.round(v))}%`
-    );
-    animateNumber(
-      tr.querySelector(".anim-ram"),
-      toFiniteOr(prevMem, memVal),
-      memVal,
-      (v) => `${Math.max(0, v).toFixed(2)}MB`
-    );
-    animateNumber(
-      tr.querySelector(".anim-net"),
-      toFiniteOr(prevNet, netVal),
-      netVal,
-      (v) => netIsMB
-        ? `${Math.max(0, v).toFixed(2)}${netUnit}`
-        : `${Math.max(0, Math.round(v))}${netUnit}`
-    );
-    animateNumber(
-      tr.querySelector(".anim-io"),
-      toFiniteOr(prevIo, ioVal),
-      ioVal,
-      (v) => netIsMB
-        ? `${Math.max(0, v).toFixed(2)}${netUnit}`
-        : `${Math.max(0, Math.round(v))}${netUnit}`
-    );
+    const prev = prevMap.get(name) || {};
+    updateRow(row, it, prev, netUnit, netIsMB);
+    frag.appendChild(row.tr);
+  }
+
+  for (const [name, row] of rowMap.entries()) {
+    if (!seen.has(name)) {
+      row.tr.remove();
+      rowMap.delete(name);
+    }
   }
 
   tbody.replaceChildren(frag);
