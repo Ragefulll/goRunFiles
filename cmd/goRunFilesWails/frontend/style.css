@@ -8,7 +8,7 @@
   --bad: #ef4444;
   --hung: rgba(239, 68, 68, 0.2);
   --grid: #232a34;
-  font-family: "bahnschrift", "Segoe UI", "Consolas", ui-monospace, Menlo, monospace;
+  font-family: Inter, "Segoe UI", Arial, sans-serif, "Cascadia Mono", Consolas, monospace, "bahnschrift", "Segoe UI", "Consolas", ui-monospace, Menlo, monospace;
   font-synthesis: none;
 }
 
@@ -47,7 +47,27 @@ html.font-size-anim {
 body { margin: 0; background: var(--bg); color: var(--text); }
 .hidden { display: none !important; }
 .wrap { max-width: 205rem; margin: 2.4rem auto; padding: 0 1.6rem; }
-.head { display: flex; align-items: center; gap: 1.6rem; flex-wrap: wrap; font-size: 1.6rem; }
+.head { align-items: center; display: flex; gap: 12px; }
+.block {
+  background: #171b21;
+  border: 1px solid #303945;
+  border-radius: 8px;
+  min-width: 170px;
+  padding: 12px 14px;
+}
+
+.block span {
+  color: #8f9aa7;
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.block strong {
+  display: block;
+  font-size: 22px;
+  margin-top: 4px;
+}
 .title { font-size: 2rem; font-weight: 600; letter-spacing: .05rem; }
 .meta { color: var(--muted); }
 #version { color: var(--warn); }
@@ -152,7 +172,7 @@ tr.hung { background: var(--hung); }
   color: var(--text);
   border: 0.1rem solid var(--grid);
   padding: 0.8rem 1rem;
-  font-family: "Consolas", ui-monospace, Menlo, monospace;
+  font-family: Inter, "Segoe UI", Arial, sans-serif, "Cascadia Mono", Consolas, monospace, "Consolas", ui-monospace, Menlo, monospace;
   font-size: 1.2rem;
   line-height: 1.4;
 }
@@ -234,7 +254,7 @@ label input, .config-panel input[type="text"], .config-panel input[type="number"
   color: var(--text);
   border: 0.1rem solid var(--grid);
   padding: 0.6rem 0.8rem;
-  font-family: "Consolas", ui-monospace, Menlo, monospace;
+  font-family: Inter, "Segoe UI", Arial, sans-serif, "Cascadia Mono", Consolas, monospace, "Consolas", ui-monospace, Menlo, monospace;
   font-size: 1.2rem;
 }
 .config-panel input[type="checkbox"] {
@@ -347,7 +367,7 @@ label input, .config-panel input[type="text"], .config-panel input[type="number"
 .modal-card {
   position: relative;
   width: 36rem;
-  margin: 15vh auto 0 auto;
+  margin: 1vh auto 0 auto;
   background: var(--panel);
   border: 0.1rem solid var(--grid);
   padding: 1.2rem;
@@ -355,7 +375,7 @@ label input, .config-panel input[type="text"], .config-panel input[type="number"
 .modal-card.modal-wide {
   width: 90vw;
   max-width: 128rem;
-  max-height: 85vh;
+  max-height: 98vh;
   overflow-y: auto;
 }
 .modal-head {

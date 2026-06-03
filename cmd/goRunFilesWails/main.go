@@ -117,8 +117,35 @@ func (g *GUI) updateSnapshot(s app.DisplaySnapshot) {
 // GetSnapshot returns the latest snapshot for UI polling.
 func (g *GUI) GetSnapshot() app.DisplaySnapshot {
 	g.mu.RLock()
-	defer g.mu.RUnlock()
-	return g.snapshot
+	s := g.snapshot
+	g.mu.RUnlock()
+	if s.Updated == "" {
+		s.CheckProcessRunning = g.mon.IsCheckProcessRunning()
+	}
+	return s
+}
+
+// StopCheckProcess pauses process checks and automatic restarts.
+func (g *GUI) StopCheckProcess() bool {
+	g.mon.StopCheckProcess()
+	g.mu.Lock()
+	g.snapshot.CheckProcessRunning = false
+	g.mu.Unlock()
+	return false
+}
+
+// StartCheckProcess resumes process checks and automatic restarts.
+func (g *GUI) StartCheckProcess() bool {
+	g.mon.StartCheckProcess()
+	g.mu.Lock()
+	g.snapshot.CheckProcessRunning = true
+	g.mu.Unlock()
+	return true
+}
+
+// IsCheckProcessRunning reports whether process checks are active.
+func (g *GUI) IsCheckProcessRunning() bool {
+	return g.mon.IsCheckProcessRunning()
 }
 
 // Start starts a process by config name.

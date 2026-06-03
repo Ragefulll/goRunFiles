@@ -13,6 +13,7 @@ const saveBtn                   = document.getElementById("saveConfig");
 const toggleBtn                 = document.getElementById("toggleConfig");
 const restartAllBtn             = document.getElementById("restartAll");
 const killCMDBtn                = document.getElementById("killCMD");
+const toggleCheckProcessBtn     = document.getElementById("toggleCheckProcess");
 const killNodeBtn               = document.getElementById("killNode");
 const toggleConsoleBtn          = document.getElementById("toggleConsole");
 const addProcessBtn             = document.getElementById("addProcess");
@@ -64,6 +65,7 @@ let tickIntervalMs = 500;
 let tickTimer = null;
 let tickInFlight = false;
 let fontAnimTimer = null;
+let checkProcessRunning = true;
 const rowMap = new Map();
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -403,6 +405,7 @@ const updateRow = (row, it, prev, netUnit, netIsMB) => {
 
 const render = (data) => {
   if (!data) return;
+  setCheckProcessButton(data.check_process_running !== false);
   elUpdated.textContent = data.updated || "—";
   elVersion.textContent = data.version || "—";
   if (elNetStatus) {
@@ -463,6 +466,15 @@ const render = (data) => {
 
   tbody.replaceChildren(frag);
   lastSnapshot = data;
+};
+
+const setCheckProcessButton = (running) => {
+  checkProcessRunning = !!running;
+  if (!toggleCheckProcessBtn) return;
+  toggleCheckProcessBtn.textContent = checkProcessRunning ? "Stop Check Process" : "Start Check Process";
+  toggleCheckProcessBtn.title = checkProcessRunning ? "Stop process checks" : "Start process checks";
+  toggleCheckProcessBtn.setAttribute("aria-label", toggleCheckProcessBtn.title);
+  toggleCheckProcessBtn.classList.toggle("active", !checkProcessRunning);
 };
 
 const tick = async () => {
@@ -534,6 +546,22 @@ killCMDBtn.addEventListener("click", async () => {
     await api.KillCMD();
   } catch (err) {
     console.error(err);
+  }
+});
+
+toggleCheckProcessBtn.addEventListener("click", async () => {
+  if (!api) return;
+  toggleCheckProcessBtn.disabled = true;
+  try {
+    const running = checkProcessRunning
+      ? await api.StopCheckProcess()
+      : await api.StartCheckProcess();
+    setCheckProcessButton(running);
+    await tick();
+  } catch (err) {
+    console.error(err);
+  } finally {
+    toggleCheckProcessBtn.disabled = false;
   }
 });
 
@@ -798,6 +826,7 @@ const openAuthModal = () => {
 };
 
 const closeAuthModal = () => {
+  console.log('CLOSE');
   authModal.classList.add("hidden");
   configPassword.value = "";
 };

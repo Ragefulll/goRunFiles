@@ -35,6 +35,7 @@ type App struct {
 	hungSince       map[string]time.Time
 	manualStop      map[string]bool
 	autoRestart     autoRestartConfig
+	checkProcess    bool
 	mu              sync.Mutex
 }
 
@@ -65,6 +66,7 @@ func New(cfg config.Config, logger *log.Logger, version string) *App {
 		restartAt:       make(map[string]time.Time),
 		hungSince:       make(map[string]time.Time),
 		manualStop:      make(map[string]bool),
+		checkProcess:    true,
 	}
 	app.applyAutoRestartSettings(cfg)
 	if err := process.SetNetworkConfig(cfg.Settings.UseETWNetwork); err != nil {
@@ -103,11 +105,18 @@ func (a *App) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-checkTicker.C:
+			if !a.IsCheckProcessRunning() {
+				a.render(statuses)
+				continue
+			}
 			now := time.Now()
 			a.maybeAutoRestart(now)
-			statuses := a.computeStatuses(false, now)
+			statuses = a.computeStatuses(false, now)
 			a.render(statuses)
 		case <-restartTicker.C:
+			if !a.IsCheckProcessRunning() {
+				continue
+			}
 			now := time.Now()
 			a.maybeAutoRestart(now)
 			a.computeStatuses(true, now)
@@ -137,7 +146,7 @@ func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot
 	if a.cfg.Settings.NetDebug {
 		netDbg = process.NetDebug()
 	}
-	onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.CheckTiming.Duration, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg))
+	onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.CheckTiming.Duration, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg, a.IsCheckProcessRunning()))
 
 	checkTicker := time.NewTicker(a.cfg.Settings.CheckTiming.Duration)
 	defer checkTicker.Stop()
@@ -150,25 +159,64 @@ func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-checkTicker.C:
+			if !a.IsCheckProcessRunning() {
+				now := time.Now()
+				netDbg := ""
+				if a.cfg.Settings.NetDebug {
+					netDbg = process.NetDebug()
+				}
+				onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.CheckTiming.Duration, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg, false))
+				continue
+			}
 			now := time.Now()
 			a.maybeAutoRestart(now)
-			statuses := a.computeStatuses(false, now)
+			statuses = a.computeStatuses(false, now)
 			netDbg := ""
 			if a.cfg.Settings.NetDebug {
 				netDbg = process.NetDebug()
 			}
-			onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.CheckTiming.Duration, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg))
+			onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.CheckTiming.Duration, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg, true))
 		case <-restartTicker.C:
+			if !a.IsCheckProcessRunning() {
+				now := time.Now()
+				netDbg := ""
+				if a.cfg.Settings.NetDebug {
+					netDbg = process.NetDebug()
+				}
+				onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.CheckTiming.Duration, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg, false))
+				continue
+			}
 			now := time.Now()
 			a.maybeAutoRestart(now)
-			statuses := a.computeStatuses(true, now)
+			statuses = a.computeStatuses(true, now)
 			netDbg := ""
 			if a.cfg.Settings.NetDebug {
 				netDbg = process.NetDebug()
 			}
-			onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.CheckTiming.Duration, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg))
+			onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.CheckTiming.Duration, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg, true))
 		}
 	}
+}
+
+// StopCheckProcess pauses process checks and automatic restarts.
+func (a *App) StopCheckProcess() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.checkProcess = false
+}
+
+// StartCheckProcess resumes process checks and automatic restarts.
+func (a *App) StartCheckProcess() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.checkProcess = true
+}
+
+// IsCheckProcessRunning reports whether process checks are active.
+func (a *App) IsCheckProcessRunning() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.checkProcess
 }
 
 func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
@@ -262,12 +310,19 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			status.Target = buildExeTarget(item, namesToCheck)
 			if alive && item.MonitorHang && item.HangTimeout.Duration > 0 {
 				hung := false
+				hungPid := 0
 				if strings.TrimSpace(item.CheckCmdline) != "" {
 					hung = isProcessHung(item.Pid)
+					if hung {
+						hungPid = item.Pid
+					}
 				} else {
-					hung = isAnyProcessHung(namesToCheck)
+					hung, hungPid = hungProcessByNames(namesToCheck)
 				}
 				status.Hung = hung
+				if hungPid > 0 {
+					status.Pid = hungPid
+				}
 				if hung {
 					if _, ok := a.hungSince[name]; !ok {
 						a.hungSince[name] = now
@@ -275,7 +330,11 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 					if now.Sub(a.hungSince[name]) >= item.HangTimeout.Duration {
 						_ = process.KillByNames(namesToCheck)
 						alive = false
-						status.Err = "Not responding"
+						if hungPid > 0 {
+							status.Err = fmt.Sprintf("Not responding PID %d", hungPid)
+						} else {
+							status.Err = "Not responding"
+						}
 						a.restartAt[name] = now
 						delete(a.hungSince, name)
 					}
@@ -380,7 +439,14 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 				status.Status = StatusRunning
 				a.last[name] = StatusRunning
 			}
-			status.Pid = item.Pid
+			displayPid := item.Pid
+			if status.Type == config.TypeExe {
+				displayPid = preferMonitoredPid(namesToCheck, displayPid)
+			}
+			if status.Hung && status.Pid > 0 {
+				displayPid = status.Pid
+			}
+			status.Pid = displayPid
 			metricsPid := status.Pid
 			if status.Type == config.TypeExe {
 				metricsPid = preferShippingPid(namesToCheck, status.Pid)
@@ -399,7 +465,9 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			}
 			a.fillTimes(&status, now)
 			delete(a.restartAt, name)
-			delete(a.hungSince, name)
+			if !status.Hung {
+				delete(a.hungSince, name)
+			}
 			statuses = append(statuses, status)
 			continue
 		}
@@ -735,21 +803,25 @@ func padRight(s string, width int) string {
 
 func parseProcessList(defaultProcess, checkProcess string) []string {
 	if strings.TrimSpace(checkProcess) == "" {
-		return []string{defaultProcess}
+		return []string{cleanProcessName(defaultProcess)}
 	}
 	parts := strings.Split(checkProcess, ",")
 	out := make([]string, 0, len(parts))
 	for _, p := range parts {
-		p = strings.TrimSpace(p)
+		p = cleanProcessName(p)
 		if p == "" {
 			continue
 		}
 		out = append(out, p)
 	}
 	if len(out) == 0 {
-		return []string{defaultProcess}
+		return []string{cleanProcessName(defaultProcess)}
 	}
 	return out
+}
+
+func cleanProcessName(name string) string {
+	return strings.Trim(strings.TrimSpace(name), "\"'")
 }
 
 func parseCSV(raw string) []string {
@@ -788,6 +860,20 @@ func preferShippingPid(namesToCheck []string, fallback int) int {
 				return pid
 			}
 		}
+	}
+	return fallback
+}
+
+func preferMonitoredPid(namesToCheck []string, fallback int) int {
+	if pid := preferShippingPid(namesToCheck, fallback); pid > 0 {
+		return pid
+	}
+	for _, name := range namesToCheck {
+		pids, err := process.PidsByName(name)
+		if err != nil || len(pids) == 0 {
+			continue
+		}
+		return pids[0]
 	}
 	return fallback
 }
@@ -965,7 +1051,7 @@ func dateKey(t time.Time) int {
 	return t.Year()*10000 + int(t.Month())*100 + t.Day()
 }
 
-func isAnyProcessHung(names []string) bool {
+func hungProcessByNames(names []string) (bool, int) {
 	for _, n := range names {
 		n = strings.TrimSpace(n)
 		if n == "" {
@@ -977,11 +1063,11 @@ func isAnyProcessHung(names []string) bool {
 		}
 		for _, pid := range pids {
 			if isProcessHung(pid) {
-				return true
+				return true, pid
 			}
 		}
 	}
-	return false
+	return false, 0
 }
 
 func validatePath(dir, name string) string {

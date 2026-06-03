@@ -9,12 +9,18 @@
   <body>
     <div class="wrap">
       <header class="head">
-        <div class="textSizeDebug"></div>
-        <div class="title">ART3D Process Monitor</div>
-        <div class="meta">Version: <span id="version">—</span></div>
-        <div class="meta">Net: <span id="netStatus">—</span></div>
-        <div class="meta">Net Debug: <span id="netDebug">—</span></div>
-        <div class="meta">Updated: <span id="updated">—</span></div>
+        <div class="block">
+          <strong class="textSizeDebug"></strong>
+          <span>&nbsp;</span>
+        </div>
+        <div class="block title">
+          <strong>ART3D Process Monitor</strong>
+          <span>&nbsp;</span>
+        </div>
+        <div class="block meta"><span>Version:</span><strong id="version">—</strong></div>
+        <div class="block meta"><span>Net:</span><strong id="netStatus">—</strong></div>
+        <div class="block meta"><span>Net Debug:</span><strong id="netDebug">—</strong></div>
+        <div class="block meta"><span>Updated:</span><strong id="updated">—</strong></div>
       </header>
 
       <section class="panel">
@@ -23,6 +29,7 @@
           <div class="panel-actions">
             <button class="panel-actions__button" id="restartAll" title="Restart all" aria-label="Restart all">Restart All</button>
             <button class="panel-actions__button" id="killCMD" title="Kill all cmd.exe" aria-label="Kill all cmd.exe">Kill CMD</button>
+            <button class="panel-actions__button" id="toggleCheckProcess" title="Stop process checks" aria-label="Stop process checks">Stop Check Process</button>
             <button class="panel-actions__button" id="killNode" title="Kill all node.exe" aria-label="Kill all node.exe">Kill Node</button>
             <button class="panel-actions__button" id="toggleConsole" title="Консоль ошибок" aria-label="Консоль ошибок">📋</button>
             <button class="panel-actions__button" id="toggleConfig" title="Настройки" aria-label="Настройки">⚙</button>
@@ -67,12 +74,12 @@
       <div class="modal-card modal-wide">
         <div class="modal-head">
           <div>Config</div>
-          <button id="closeConfig" title="Закрыть">✕</button>
         </div>
         <div class="config-actions">
           <button class="panel-actions__button fixed" id="reloadConfig">Reload</button>
           <button class="panel-actions__button fixed" id="saveConfig">Save</button>
           <button class="panel-actions__button fixed" id="addProcess">Add process</button>
+          <button id="closeConfig" title="Закрыть">✕</button>
         </div>
         <div id="configPanel" class="config-panel">
           <h3>Scheduler</h3>

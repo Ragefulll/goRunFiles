@@ -23,6 +23,8 @@ function Copy-ConfigNextToExe {
 function Enable-CgoIfWindows {
   if (-not $IsWindows) { return }
   $env:CGO_ENABLED = "1"
+  $env:Path = "C:\msys64\ucrt64\bin;$env:Path"
+  Write-Host "CGO_ENABLED=1 and PATH updated with MSYS2" -ForegroundColor Green
   try {
     $null = & gcc --version 2>$null
   } catch {
