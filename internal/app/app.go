@@ -32,6 +32,7 @@ type App struct {
 	lastRenderLines int
 	lastRenderWidth int
 	restartAt       map[string]time.Time
+	firstStart      map[string]bool
 	hungSince       map[string]time.Time
 	manualStop      map[string]bool
 	autoRestart     autoRestartConfig
@@ -64,6 +65,7 @@ func New(cfg config.Config, logger *log.Logger, version string) *App {
 		defaultDisabled: buildDefaultDisabledMap(cfg),
 		startTimes:      make(map[int]int64),
 		restartAt:       make(map[string]time.Time),
+		firstStart:      buildFirstStartMap(cfg),
 		hungSince:       make(map[string]time.Time),
 		manualStop:      make(map[string]bool),
 		checkProcess:    true,
@@ -465,6 +467,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			}
 			a.fillTimes(&status, now)
 			delete(a.restartAt, name)
+			delete(a.firstStart, name)
 			if !status.Hung {
 				delete(a.hungSince, name)
 			}
@@ -484,7 +487,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 		}
 
 		if _, ok := a.restartAt[name]; !ok {
-			a.restartAt[name] = now.Add(a.cfg.Settings.RestartTiming.Duration)
+			a.restartAt[name] = now.Add(a.restartDelay(name, item))
 		}
 
 		if doRestart && !a.restartAt[name].After(now) {
@@ -499,6 +502,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			status.Pid = pid
 			status.Status = StatusStarted
 			a.last[name] = StatusStarted
+			delete(a.firstStart, name)
 			if pid > 0 {
 				a.startTimes[pid] = time.Now().UnixMilli()
 				a.fillTimes(&status, now)
@@ -597,6 +601,7 @@ func (a *App) UpdateConfig(cfg config.Config) {
 	a.defaultDisabled = buildDefaultDisabledMap(cfg)
 	a.startTimes = make(map[int]int64)
 	a.restartAt = make(map[string]time.Time)
+	a.firstStart = buildFirstStartMap(cfg)
 	a.hungSince = make(map[string]time.Time)
 	a.manualStop = make(map[string]bool)
 	for name := range cfg.Process {
@@ -631,6 +636,7 @@ func (a *App) StartProcess(name string) error {
 		item.Disabled = false
 		delete(a.manualStop, name)
 		delete(a.restartAt, name)
+		delete(a.firstStart, name)
 		delete(a.hungSince, name)
 		a.last[name] = StatusRunning
 		return fmt.Errorf("process %q is already running", name)
@@ -644,6 +650,7 @@ func (a *App) StartProcess(name string) error {
 	item.Pid = pid
 	a.last[name] = StatusStarted
 	delete(a.manualStop, name)
+	delete(a.firstStart, name)
 	return nil
 }
 
@@ -660,6 +667,7 @@ func (a *App) StopProcess(name string) error {
 	}
 	a.manualStop[name] = true
 	delete(a.restartAt, name)
+	delete(a.firstStart, name)
 	return stopProcessItem(item)
 }
 
@@ -676,6 +684,7 @@ func (a *App) RestartProcess(name string) error {
 	// Manual RESTART should not leave the process in manual-stop mode.
 	delete(a.manualStop, name)
 	delete(a.restartAt, name)
+	delete(a.firstStart, name)
 	delete(a.hungSince, name)
 	// Explicit restart enables the process for regular monitoring.
 	item.Disabled = false
@@ -692,6 +701,7 @@ func (a *App) RestartProcess(name string) error {
 
 	item.Pid = pid
 	a.last[name] = StatusStarted
+	delete(a.firstStart, name)
 	if pid > 0 {
 		a.startTimes[pid] = time.Now().UnixMilli()
 	}
@@ -726,6 +736,7 @@ func (a *App) RestartAll() error {
 		}
 		item.Pid = pid
 		a.last[name] = StatusStarted
+		delete(a.firstStart, name)
 		if pid > 0 {
 			a.startTimes[pid] = time.Now().UnixMilli()
 		}
@@ -850,6 +861,24 @@ func buildDefaultDisabledMap(cfg config.Config) map[string]bool {
 		out[name] = item.Disabled
 	}
 	return out
+}
+
+func buildFirstStartMap(cfg config.Config) map[string]bool {
+	out := make(map[string]bool, len(cfg.Process))
+	for name, item := range cfg.Process {
+		if item == nil || item.Disabled {
+			continue
+		}
+		out[name] = true
+	}
+	return out
+}
+
+func (a *App) restartDelay(name string, item *config.ProcessItem) time.Duration {
+	if a.firstStart[name] && item.DelayStartTime.Duration > 0 {
+		return item.DelayStartTime.Duration
+	}
+	return a.cfg.Settings.RestartTiming.Duration
 }
 
 func preferShippingPid(namesToCheck []string, fallback int) int {

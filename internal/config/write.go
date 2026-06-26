@@ -51,6 +51,9 @@ func WriteFromDTO(path string, dto ConfigDTO) error {
 		if p.Type != "" {
 			b.WriteString(fmt.Sprintf("type=%s\n", p.Type))
 		}
+		if strings.TrimSpace(p.DelayStartTime) != "" {
+			b.WriteString(fmt.Sprintf("delayStartTime=%s\n", p.DelayStartTime))
+		}
 		b.WriteString(fmt.Sprintf("monitorHang=%v\n", p.MonitorHang))
 		if strings.TrimSpace(p.HangTimeout) != "" {
 			b.WriteString(fmt.Sprintf("hangTimeout=%s\n", p.HangTimeout))

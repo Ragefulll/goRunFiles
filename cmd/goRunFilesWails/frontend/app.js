@@ -646,6 +646,9 @@ const buildProcessRow = (p = {}) => {
       <label>CheckCmdlineExclude
         <input data-f="checkCmdlineExclude" value="${initialExclude}" />
       </label>
+      <label>DelayStartTime
+        <input data-f="delayStartTime" value="${p.delayStartTime || ""}" placeholder="30s" />
+      </label>
       <label>MonitorHang
         <input data-f="monitorHang" type="checkbox" ${p.monitorHang ? "checked" : ""} />
       </label>
@@ -689,6 +692,7 @@ const collectConfig = () => {
       checkProcess: get("checkProcess").value,
       checkCmdline: get("checkCmdline").value,
       checkCmdlineExclude: get("checkCmdlineExclude").value,
+      delayStartTime: get("delayStartTime").value,
       monitorHang: get("monitorHang").checked,
       hangTimeout: get("hangTimeout").value,
     });

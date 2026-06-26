@@ -19,6 +19,7 @@ type ProcessDTO struct {
 	CheckProcess        string `json:"checkProcess"`
 	CheckCmdline        string `json:"checkCmdline"`
 	CheckCmdlineExclude string `json:"checkCmdlineExclude"`
+	DelayStartTime      string `json:"delayStartTime"`
 	MonitorHang         bool   `json:"monitorHang"`
 	HangTimeout         string `json:"hangTimeout"`
 }
@@ -84,6 +85,7 @@ func ToDTO(cfg Config) ConfigDTO {
 			CheckProcess:        p.CheckProcess,
 			CheckCmdline:        p.CheckCmdline,
 			CheckCmdlineExclude: p.CheckCmdlineExclude,
+			DelayStartTime:      durStringZero(p.DelayStartTime),
 			MonitorHang:         p.MonitorHang,
 			HangTimeout:         durString(p.HangTimeout),
 		})
@@ -137,6 +139,10 @@ func FromDTO(dto ConfigDTO) (Config, error) {
 		if err := ht.UnmarshalText([]byte(p.HangTimeout)); err != nil {
 			return Config{}, fmt.Errorf("hangTimeout for %s: %w", name, err)
 		}
+		var dst Duration
+		if err := dst.UnmarshalText([]byte(p.DelayStartTime)); err != nil {
+			return Config{}, fmt.Errorf("delayStartTime for %s: %w", name, err)
+		}
 
 		cfg.Process[name] = &ProcessItem{
 			Disabled:            p.Disabled,
@@ -148,6 +154,7 @@ func FromDTO(dto ConfigDTO) (Config, error) {
 			CheckProcess:        p.CheckProcess,
 			CheckCmdline:        p.CheckCmdline,
 			CheckCmdlineExclude: p.CheckCmdlineExclude,
+			DelayStartTime:      dst,
 			MonitorHang:         p.MonitorHang,
 			HangTimeout:         ht,
 		}
@@ -158,6 +165,13 @@ func FromDTO(dto ConfigDTO) (Config, error) {
 func durString(d Duration) string {
 	if d.Duration == 0 {
 		return ""
+	}
+	return d.Duration.String()
+}
+
+func durStringZero(d Duration) string {
+	if d.Duration == 0 {
+		return "0s"
 	}
 	return d.Duration.String()
 }
