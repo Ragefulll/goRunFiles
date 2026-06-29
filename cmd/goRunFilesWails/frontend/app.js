@@ -48,7 +48,9 @@ const cfgNetScale               = document.getElementById("cfgNetScale");
 const cfgLaunchInNewConsole     = document.getElementById("cfgLaunchInNewConsole");
 const cfgAutoCloseErrorDialogs  = document.getElementById("cfgAutoCloseErrorDialogs");
 const cfgErrorWindowTitles      = document.getElementById("cfgErrorWindowTitles");
+const cfgFind                   = document.getElementById("cfgFind");
 const cfgProcesses              = document.getElementById("configProcesses");
+const cfgScreens                = document.getElementById("cfgScreens");
 
 let lastSnapshot = null;
 const HISTORY_LEN = 40;
@@ -61,12 +63,15 @@ const errorLogLines = [];
 const lastErrorByProcess = new Map();
 let consoleOpened = false;
 const CMD_CHECK_CMDLINE_EXCLUDE_DEFAULT = "jetbrains,js-language-service,typingsinstaller,eslint";
+let availableScreens = [];
 let tickIntervalMs = 500;
 let tickTimer = null;
 let tickInFlight = false;
 let fontAnimTimer = null;
 let checkProcessRunning = true;
 const rowMap = new Map();
+
+let currentConfigModel = null;
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
@@ -117,6 +122,56 @@ const buildSparkline = (values, color) => {
 const toFiniteOr = (v, fallback) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
+};
+
+const escapeAttr = (value) => String(value ?? "")
+  .replaceAll("&", "&amp;")
+  .replaceAll('"', "&quot;")
+  .replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;");
+
+const screenLabel = (screen) => {
+  const parts = [
+    `${screen.index}: ${screen.name || `Screen ${screen.index}`}`,
+    `${screen.width}x${screen.height}`,
+    `x=${screen.x}`,
+    `y=${screen.y}`,
+  ];
+  if (screen.primary) parts.push("primary");
+  return parts.join(" | ");
+};
+
+const refreshScreens = async () => {
+  if (!api?.GetScreens) {
+    availableScreens = [];
+    if (cfgScreens) cfgScreens.textContent = "Screen list is unavailable";
+    return;
+  }
+  try {
+    const screens = await api.GetScreens();
+    availableScreens = Array.isArray(screens) ? screens : [];
+    if (cfgScreens) {
+      cfgScreens.textContent = availableScreens.length
+        ? availableScreens.map(screenLabel).join("\n")
+        : "No screens detected";
+    }
+  } catch (err) {
+    availableScreens = [];
+    if (cfgScreens) cfgScreens.textContent = err.message || String(err);
+  }
+};
+
+const buildScreenOptions = (selected) => {
+  const current = Number(selected) || 0;
+  const opts = ['<option value="0">Default</option>'];
+  for (const screen of availableScreens) {
+    const index = Number(screen.index) || 0;
+    opts.push(`<option value="${index}" ${current === index ? "selected" : ""}>${escapeAttr(screenLabel(screen))}</option>`);
+  }
+  if (current > 0 && !availableScreens.some((screen) => Number(screen.index) === current)) {
+    opts.push(`<option value="${current}" selected>Screen ${current} (not detected)</option>`);
+  }
+  return opts.join("");
 };
 
 const animateNumber = (el, from, to, format, duration = ANIM_DURATION_MS) => {
@@ -585,6 +640,9 @@ toggleConsoleBtn.addEventListener("click", () => {
 
 const renderConfig = (model) => {
   if (!model) return;
+
+  currentConfigModel = model;
+
   const s = model.settings || {};
   cfgCheckTiming.value = s.checkTiming || "";
   cfgRestartTiming.value = s.restartTiming || "";
@@ -600,7 +658,19 @@ const renderConfig = (model) => {
   cfgErrorWindowTitles.value = s.errorWindowTitles || "";
 
   cfgProcesses.innerHTML = "";
+
+  const filter = cfgFind.value.trim().toLowerCase();
+
   for (const p of model.processes || []) {
+    if (
+        filter &&
+        !(
+            (p.name || "").toLowerCase().includes(filter)
+        )
+    ) {
+      continue;
+    }
+
     cfgProcesses.appendChild(buildProcessRow(p));
   }
 };
@@ -613,7 +683,7 @@ const buildProcessRow = (p = {}) => {
   card.innerHTML = `
     <div class="process-grid">
       <label>Name
-        <input data-f="name" value="${p.name || ""}" />
+        <input data-f="name" value="${escapeAttr(p.name)}" />
       </label>
       <label>Disabled
         <input data-f="disabled" type="checkbox" ${p.disabled ? "checked" : ""} />
@@ -626,34 +696,39 @@ const buildProcessRow = (p = {}) => {
         </select>
       </label>
       <label>Process
-        <input data-f="process" value="${p.process || ""}" />
+        <input data-f="process" value="${escapeAttr(p.process)}" />
       </label>
       <label>Path
-        <input data-f="path" value="${p.path || ""}" />
+        <input data-f="path" value="${escapeAttr(p.path)}" />
       </label>
       <label>Command
-        <input data-f="command" value="${p.command || ""}" />
+        <input data-f="command" value="${escapeAttr(p.command)}" />
       </label>
       <label>Args
-        <input data-f="args" value="${p.args || ""}" />
+        <input data-f="args" value="${escapeAttr(p.args)}" />
+      </label>
+      <label>Screen
+        <select data-f="screen">
+          ${buildScreenOptions(p.screen)}
+        </select>
       </label>
       <label>CheckProcess
-        <input data-f="checkProcess" value="${p.checkProcess || ""}" />
+        <input data-f="checkProcess" value="${escapeAttr(p.checkProcess)}" />
       </label>
       <label>CheckCmdline
-        <input data-f="checkCmdline" value="${p.checkCmdline || ""}" />
+        <input data-f="checkCmdline" value="${escapeAttr(p.checkCmdline)}" />
       </label>
       <label>CheckCmdlineExclude
-        <input data-f="checkCmdlineExclude" value="${initialExclude}" />
+        <input data-f="checkCmdlineExclude" value="${escapeAttr(initialExclude)}" />
       </label>
       <label>DelayStartTime
-        <input data-f="delayStartTime" value="${p.delayStartTime || ""}" placeholder="30s" />
+        <input data-f="delayStartTime" value="${escapeAttr(p.delayStartTime)}" placeholder="30s" />
       </label>
       <label>MonitorHang
         <input data-f="monitorHang" type="checkbox" ${p.monitorHang ? "checked" : ""} />
       </label>
       <label>HangTimeout
-        <input data-f="hangTimeout" value="${p.hangTimeout || ""}" />
+        <input data-f="hangTimeout" value="${escapeAttr(p.hangTimeout)}" />
       </label>
     </div>
     <div class="process-actions">
@@ -689,6 +764,7 @@ const collectConfig = () => {
       path: get("path").value,
       command: get("command").value,
       args: get("args").value,
+      screen: Number(get("screen")?.value || 0),
       checkProcess: get("checkProcess").value,
       checkCmdline: get("checkCmdline").value,
       checkCmdlineExclude: get("checkCmdlineExclude").value,
@@ -711,6 +787,7 @@ const collectConfig = () => {
       launchInNewConsole: cfgLaunchInNewConsole.checked,
       autoCloseErrorDialogs: cfgAutoCloseErrorDialogs.checked,
       errorWindowTitles: cfgErrorWindowTitles.value,
+      cfgFind: cfgFind.value,
     },
     processes,
   };
@@ -719,8 +796,20 @@ const collectConfig = () => {
 reloadBtn.addEventListener("click", async () => {
   if (!api) return;
   if (!unlocked) return;
+  await refreshScreens();
   const model = await api.GetConfigModel();
   renderConfig(model);
+});
+
+cfgFind.addEventListener("input", () => {
+  renderConfig(currentConfigModel);
+});
+
+cfgFind.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    cfgFind.value = "";
+    renderConfig(currentConfigModel);
+  }
 });
 
 saveBtn.addEventListener("click", async () => {
@@ -767,6 +856,7 @@ window.onload = async () => {
   await tick();
   if (api) {
     if (unlocked) {
+      await refreshScreens();
       const model = await api.GetConfigModel();
       renderConfig(model);
     }
@@ -817,6 +907,7 @@ const unlockConfig = async () => {
   document.querySelector(".config-actions").classList.remove("hidden");
   configPanel.classList.remove("hidden");
   configModal.classList.remove("hidden");
+  await refreshScreens();
   const model = await api.GetConfigModel();
   renderConfig(model);
   await refreshSchedulerStatus();

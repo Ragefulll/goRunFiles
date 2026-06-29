@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"goRunFiles/internal/config"
+	"goRunFiles/internal/display"
 )
 
 // Start launches the process described by item and returns a PID for cmd tasks.
@@ -30,6 +31,7 @@ func Start(item *config.ProcessItem, launchInNewConsole bool) (int, error) {
 		if err := cmd.Start(); err != nil {
 			return 0, err
 		}
+		moveWindowAsync(cmd.Process.Pid, item.Screen)
 		return cmd.Process.Pid, nil
 	case config.TypeCmd:
 		var cmd *exec.Cmd
@@ -44,6 +46,7 @@ func Start(item *config.ProcessItem, launchInNewConsole bool) (int, error) {
 		if err := cmd.Start(); err != nil {
 			return 0, err
 		}
+		moveWindowAsync(cmd.Process.Pid, item.Screen)
 		return cmd.Process.Pid, nil
 	case config.TypeBat:
 		if item.Process == "" {
@@ -70,10 +73,20 @@ func Start(item *config.ProcessItem, launchInNewConsole bool) (int, error) {
 		if err := cmd.Start(); err != nil {
 			return 0, err
 		}
+		moveWindowAsync(cmd.Process.Pid, item.Screen)
 		return cmd.Process.Pid, nil
 	default:
 		return 0, fmt.Errorf("unknown process type %q", item.Type)
 	}
+}
+
+func moveWindowAsync(pid int, screen int) {
+	if pid <= 0 || screen <= 0 {
+		return
+	}
+	go func() {
+		_ = display.MoveProcessWindowToScreen(pid, screen)
+	}()
 }
 
 func splitArgs(raw string) []string {

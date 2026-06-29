@@ -48,6 +48,9 @@ func WriteFromDTO(path string, dto ConfigDTO) error {
 		if p.Args != "" {
 			b.WriteString(fmt.Sprintf("args=%s\n", quoteIfNeeded(p.Args)))
 		}
+		if p.Screen > 0 {
+			b.WriteString(fmt.Sprintf("screen=%d\n", p.Screen))
+		}
 		if p.Type != "" {
 			b.WriteString(fmt.Sprintf("type=%s\n", p.Type))
 		}

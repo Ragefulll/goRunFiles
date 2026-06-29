@@ -33,6 +33,7 @@ type ProcessItem struct {
 	Path                string
 	Command             string
 	Args                string
+	Screen              int
 	Type                string // exe | cmd
 	Pid                 int
 }

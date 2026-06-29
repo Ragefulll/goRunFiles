@@ -14,6 +14,7 @@ import (
 
 	"goRunFiles/internal/app"
 	"goRunFiles/internal/config"
+	"goRunFiles/internal/display"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -123,6 +124,11 @@ func (g *GUI) GetSnapshot() app.DisplaySnapshot {
 		s.CheckProcessRunning = g.mon.IsCheckProcessRunning()
 	}
 	return s
+}
+
+// GetScreens returns monitors available in the current desktop session.
+func (g *GUI) GetScreens() ([]display.Screen, error) {
+	return display.ListScreens()
 }
 
 // StopCheckProcess pauses process checks and automatic restarts.

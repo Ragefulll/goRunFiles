@@ -281,11 +281,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			namesToCheck = parseProcessList(item.Process, item.CheckProcess)
 			checkCmdline := strings.TrimSpace(item.CheckCmdline)
 			if checkCmdline != "" {
-				checkName := strings.TrimSpace(item.CheckProcess)
-				if checkName == "" {
-					checkName = item.Process
-				}
-				ok, pid, err := process.ByNameAndCmdlineArgsExactWithExclude(checkName, checkCmdline, item.CheckCmdlineExclude)
+				ok, pid, err := byProcessListAndCmdline(item.Process, item.CheckProcess, checkCmdline, item.CheckCmdlineExclude)
 				if err != nil {
 					status.Err = err.Error()
 				}
@@ -346,7 +342,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			}
 		case config.TypeCmd:
 			if strings.TrimSpace(item.CheckCmdline) != "" {
-				ok, pid, err := process.ByNameAndCmdlineArgsExactWithExclude(item.CheckProcess, item.CheckCmdline, item.CheckCmdlineExclude)
+				ok, pid, err := byProcessListAndCmdline("", item.CheckProcess, item.CheckCmdline, item.CheckCmdlineExclude)
 				if err != nil {
 					status.Err = err.Error()
 				}
@@ -379,7 +375,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			}
 			checkCmdline := strings.TrimSpace(item.CheckCmdline)
 			if checkCmdline != "" {
-				ok, pid, err := process.ByNameAndCmdlineArgsExactWithExclude(item.CheckProcess, checkCmdline, item.CheckCmdlineExclude)
+				ok, pid, err := byProcessListAndCmdline("", item.CheckProcess, checkCmdline, item.CheckCmdlineExclude)
 				if err != nil {
 					status.Err = err.Error()
 				}
@@ -442,7 +438,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 				a.last[name] = StatusRunning
 			}
 			displayPid := item.Pid
-			if status.Type == config.TypeExe {
+			if status.Type == config.TypeExe && strings.TrimSpace(item.CheckCmdline) == "" {
 				displayPid = preferMonitoredPid(namesToCheck, displayPid)
 			}
 			if status.Hung && status.Pid > 0 {
@@ -450,7 +446,7 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 			}
 			status.Pid = displayPid
 			metricsPid := status.Pid
-			if status.Type == config.TypeExe {
+			if status.Type == config.TypeExe && strings.TrimSpace(item.CheckCmdline) == "" {
 				metricsPid = preferShippingPid(namesToCheck, status.Pid)
 			}
 			if metricsPid > 0 {
@@ -831,6 +827,39 @@ func parseProcessList(defaultProcess, checkProcess string) []string {
 	return out
 }
 
+func byProcessListAndCmdline(defaultProcess, checkProcess, checkCmdline, exclude string) (bool, int, error) {
+	names := parseProcessList(defaultProcess, checkProcess)
+	if len(names) == 0 {
+		names = []string{""}
+	}
+	var lastErr error
+	for _, name := range names {
+		ok, pid, err := process.ByNameAndCmdlineArgsExactWithExclude(name, checkCmdline, exclude)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if ok {
+			return true, pid, nil
+		}
+	}
+	return false, 0, lastErr
+}
+
+func killByProcessListAndCmdline(defaultProcess, checkProcess, checkCmdline, exclude string) error {
+	names := parseProcessList(defaultProcess, checkProcess)
+	if len(names) == 0 {
+		names = []string{""}
+	}
+	var lastErr error
+	for _, name := range names {
+		if err := process.KillByNameAndCmdlineArgsExactWithExclude(name, checkCmdline, exclude); err != nil {
+			lastErr = err
+		}
+	}
+	return lastErr
+}
+
 func cleanProcessName(name string) string {
 	return strings.Trim(strings.TrimSpace(name), "\"'")
 }
@@ -1124,11 +1153,7 @@ func stopProcessItem(item *config.ProcessItem) error {
 			}
 		}
 		if strings.TrimSpace(item.CheckCmdline) != "" {
-			checkName := strings.TrimSpace(item.CheckProcess)
-			if checkName == "" {
-				checkName = item.Process
-			}
-			if err := process.KillByNameAndCmdlineArgsExactWithExclude(checkName, item.CheckCmdline, item.CheckCmdlineExclude); err != nil {
+			if err := killByProcessListAndCmdline(item.Process, item.CheckProcess, item.CheckCmdline, item.CheckCmdlineExclude); err != nil {
 				lastErr = err
 			}
 		} else {
@@ -1141,7 +1166,7 @@ func stopProcessItem(item *config.ProcessItem) error {
 		return lastErr
 	case config.TypeCmd, config.TypeBat:
 		if strings.TrimSpace(item.CheckCmdline) != "" {
-			if err := process.KillByNameAndCmdlineArgsExactWithExclude(item.CheckProcess, item.CheckCmdline, item.CheckCmdlineExclude); err != nil {
+			if err := killByProcessListAndCmdline("", item.CheckProcess, item.CheckCmdline, item.CheckCmdlineExclude); err != nil {
 				return err
 			}
 			item.Pid = 0
@@ -1172,11 +1197,7 @@ func isProcessItemAlive(item *config.ProcessItem) (bool, int, error) {
 	case config.TypeExe:
 		checkCmdline := strings.TrimSpace(item.CheckCmdline)
 		if checkCmdline != "" {
-			checkName := strings.TrimSpace(item.CheckProcess)
-			if checkName == "" {
-				checkName = item.Process
-			}
-			ok, pid, err := process.ByNameAndCmdlineArgsExactWithExclude(checkName, checkCmdline, item.CheckCmdlineExclude)
+			ok, pid, err := byProcessListAndCmdline(item.Process, item.CheckProcess, checkCmdline, item.CheckCmdlineExclude)
 			if err != nil {
 				return false, 0, err
 			}
@@ -1200,7 +1221,7 @@ func isProcessItemAlive(item *config.ProcessItem) (bool, int, error) {
 		return false, 0, lastErr
 	case config.TypeCmd, config.TypeBat:
 		if strings.TrimSpace(item.CheckCmdline) != "" {
-			ok, pid, err := process.ByNameAndCmdlineArgsExactWithExclude(item.CheckProcess, item.CheckCmdline, item.CheckCmdlineExclude)
+			ok, pid, err := byProcessListAndCmdline("", item.CheckProcess, item.CheckCmdline, item.CheckCmdlineExclude)
 			if err != nil {
 				return false, 0, err
 			}

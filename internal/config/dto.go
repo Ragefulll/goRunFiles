@@ -16,6 +16,7 @@ type ProcessDTO struct {
 	Path                string `json:"path"`
 	Command             string `json:"command"`
 	Args                string `json:"args"`
+	Screen              int    `json:"screen"`
 	CheckProcess        string `json:"checkProcess"`
 	CheckCmdline        string `json:"checkCmdline"`
 	CheckCmdlineExclude string `json:"checkCmdlineExclude"`
@@ -82,6 +83,7 @@ func ToDTO(cfg Config) ConfigDTO {
 			Path:                p.Path,
 			Command:             p.Command,
 			Args:                p.Args,
+			Screen:              p.Screen,
 			CheckProcess:        p.CheckProcess,
 			CheckCmdline:        p.CheckCmdline,
 			CheckCmdlineExclude: p.CheckCmdlineExclude,
@@ -151,6 +153,7 @@ func FromDTO(dto ConfigDTO) (Config, error) {
 			Path:                p.Path,
 			Command:             p.Command,
 			Args:                p.Args,
+			Screen:              p.Screen,
 			CheckProcess:        p.CheckProcess,
 			CheckCmdline:        p.CheckCmdline,
 			CheckCmdlineExclude: p.CheckCmdlineExclude,

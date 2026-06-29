@@ -331,6 +331,14 @@ label input, .config-panel input[type="text"], .config-panel input[type="number"
   gap: 0.8rem;
   flex-wrap: wrap;
 }
+.screen-list {
+  border: 0.1rem solid var(--grid);
+  background: #10141b;
+  color: var(--muted);
+  margin-bottom: 1.2rem;
+  padding: 1rem;
+  white-space: pre-line;
+}
 .process-list {
   display: grid;
   gap: 1rem;
