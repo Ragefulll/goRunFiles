@@ -638,6 +638,18 @@ toggleConsoleBtn.addEventListener("click", () => {
   }
 });
 
+const applyFilter = () => {
+  const filter = cfgFind.value.trim().toLowerCase();
+  for (const card of cfgProcesses.querySelectorAll(".process-card")) {
+    const name = (card.querySelector('[data-f="name"]')?.value || "").trim().toLowerCase();
+    if (!filter || name.includes(filter)) {
+      card.classList.remove("hidden-by-filter");
+    } else {
+      card.classList.add("hidden-by-filter");
+    }
+  }
+};
+
 const renderConfig = (model) => {
   if (!model) return;
   currentConfigModel = model;
@@ -658,20 +670,11 @@ const renderConfig = (model) => {
 
   cfgProcesses.innerHTML = "";
 
-  const filter = cfgFind.value.trim().toLowerCase();
-
   for (const p of model.processes || []) {
-    if (
-        filter &&
-        !(
-            (p.name || "").toLowerCase().includes(filter)
-        )
-    ) {
-      continue;
-    }
-
     cfgProcesses.appendChild(buildProcessRow(p));
   }
+
+  applyFilter();
 };
 
 const buildProcessRow = (p = {}) => {
@@ -801,28 +804,20 @@ reloadBtn.addEventListener("click", async () => {
 });
 
 cfgFind.addEventListener("input", () => {
-  renderConfig(currentConfigModel);
+  applyFilter();
 });
 
 cfgFind.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     cfgFind.value = "";
-    renderConfig(currentConfigModel);
+    applyFilter();
   }
 });
-
-const clearFinder = (model) => {
-  cfgFind.value = "";
-
-  model.settings = collectConfig().settings;
-};
 
 saveBtn.addEventListener("click", async () => {
   if (!api) return;
   if (!unlocked) return;
   try {
-    clearFinder(currentConfigModel);
-    renderConfig(currentConfigModel);
     const model = collectConfig();
 
     await api.SaveConfigModel(model);

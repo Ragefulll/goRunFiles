@@ -402,3 +402,4 @@ label input, .config-panel input[type="text"], .config-panel input[type="number"
 .modal-actions {
   margin-top: 1rem;
 }
+.hidden-by-filter { display: none; }
