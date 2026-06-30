@@ -200,6 +200,11 @@ func (g *GUI) RestartAll() error {
 	return g.mon.RestartAll()
 }
 
+// StopAll stops all enabled processes.
+func (g *GUI) StopAll() error {
+	return g.mon.StopAll()
+}
+
 // KillCMD force-kills all cmd.exe processes.
 func (g *GUI) KillCMD() error {
 	return killImage("cmd.exe")

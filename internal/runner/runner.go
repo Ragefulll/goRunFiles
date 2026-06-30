@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,6 +25,7 @@ func Start(item *config.ProcessItem, launchInNewConsole bool) (int, error) {
 		}
 
 		args := splitArgs(item.Args)
+		args = injectWindowPosition(args, item.Screen, processPath)
 		cmd := exec.Command(processPath, args...)
 		cmd.Dir = filepath.Dir(processPath)
 		hideWindow(cmd)
@@ -85,8 +87,57 @@ func moveWindowAsync(pid int, screen int) {
 		return
 	}
 	go func() {
-		_ = display.MoveProcessWindowToScreen(pid, screen)
+		if err := display.MoveProcessWindowToScreen(pid, screen); err != nil {
+			log.Printf("moveWindowAsync: pid=%d screen=%d error: %v", pid, screen, err)
+		}
 	}()
+}
+
+func injectWindowPosition(args []string, screen int, processPath string) []string {
+	log.Printf("[injectWindowPosition] screen=%d args=%q", screen, args)
+	if screen <= 0 || len(args) == 0 {
+		log.Printf("[injectWindowPosition] early return: screen=%d args_len=%d", screen, len(args))
+		return args
+	}
+	screens, err := display.ListScreens()
+	log.Printf("[injectWindowPosition] ListScreens: count=%d err=%v", len(screens), err)
+	if err != nil || screen > len(screens) {
+		log.Printf("[injectWindowPosition] screen out of range or err: screen=%d screens_count=%d err=%v", screen, len(screens), err)
+		return args
+	}
+	target := screens[screen-1]
+	pos := fmt.Sprintf("--window-position=%d,%d", target.X, target.Y)
+	log.Printf("[injectWindowPosition] target screen index=%d pos=%s", screen-1, pos)
+	out := make([]string, 0, len(args)+2)
+	replaced := false
+	hasUserDataDir := false
+	for _, a := range args {
+		if strings.HasPrefix(strings.ToLower(a), "--window-position=") {
+			out = append(out, pos)
+			replaced = true
+		} else {
+			out = append(out, a)
+		}
+		if strings.HasPrefix(strings.ToLower(a), "--user-data-dir") {
+			hasUserDataDir = true
+		}
+	}
+	if !replaced {
+		out = append(out, pos)
+	}
+	// Chrome single-instance workaround: force separate instance so that
+	// --window-position is actually honoured and moveWindowAsync can find
+	// the real browser PID in the process tree.
+	if !hasUserDataDir {
+		exe := strings.ToLower(filepath.Base(processPath))
+		if exe == "chrome.exe" {
+			userDir := fmt.Sprintf(`--user-data-dir=%s\art3d-chrome-%d`, os.TempDir(), screen)
+			out = append(out, userDir, "--no-first-run")
+			log.Printf("[injectWindowPosition] added %s for separate Chrome instance", userDir)
+		}
+	}
+	log.Printf("[injectWindowPosition] final args=%q", out)
+	return out
 }
 
 func splitArgs(raw string) []string {

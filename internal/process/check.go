@@ -379,6 +379,9 @@ func tokenMatchesNeedle(token, needle string) bool {
 			return true
 		}
 	}
+	if strings.Contains(t, n) {
+		return true
+	}
 	return false
 }
 

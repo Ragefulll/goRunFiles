@@ -12,6 +12,7 @@ const reloadBtn                 = document.getElementById("reloadConfig");
 const saveBtn                   = document.getElementById("saveConfig");
 const toggleBtn                 = document.getElementById("toggleConfig");
 const restartAllBtn             = document.getElementById("restartAll");
+const stopAllBtn                = document.getElementById("stopAll");
 const killCMDBtn                = document.getElementById("killCMD");
 const toggleCheckProcessBtn     = document.getElementById("toggleCheckProcess");
 const killNodeBtn               = document.getElementById("killNode");
@@ -141,6 +142,82 @@ const screenLabel = (screen) => {
   return parts.join(" | ");
 };
 
+const renderScreenViz = (screens) => {
+  if (!cfgScreens) return;
+
+  if (!screens.length) {
+    cfgScreens.textContent = "No screens detected";
+    cfgScreens.style.height = "";
+    return;
+  }
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const s of screens) {
+    if (s.x < minX) minX = s.x;
+    if (s.y < minY) minY = s.y;
+    if (s.x + s.width > maxX) maxX = s.x + s.width;
+    if (s.y + s.height > maxY) maxY = s.y + s.height;
+  }
+
+  const virtW = maxX - minX;
+  const virtH = maxY - minY;
+  if (virtW <= 0 || virtH <= 0) {
+    cfgScreens.textContent = screens.map((s) => screenLabel(s)).join("\n");
+    cfgScreens.style.height = "";
+    return;
+  }
+
+  const availW = Math.max(cfgScreens.clientWidth - 32, 200);
+  const maxH = 260;
+  const scale = Math.min(availW / virtW, maxH / virtH);
+
+  cfgScreens.innerHTML = "";
+  cfgScreens.style.position = "relative";
+  cfgScreens.style.height = Math.round(virtH * scale) + "px";
+
+  for (const s of screens) {
+    const left = (s.x - minX) * scale;
+    const top = (s.y - minY) * scale;
+    const w = Math.max(s.width * scale - 4, 50);
+    const h = Math.max(s.height * scale - 4, 34);
+
+    const el = document.createElement("div");
+    el.className = "monitor-viz";
+    el.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px`;
+    el.title = s.name || `Screen ${s.index}`;
+
+    const num = document.createElement("div");
+    num.className = "monitor-num";
+    num.textContent = s.index;
+
+    const nameEl = document.createElement("div");
+    nameEl.className = "monitor-name";
+    nameEl.textContent = s.name || `DISPLAY${s.index}`;
+
+    const info = document.createElement("div");
+    info.className = "monitor-info";
+    info.textContent = `${s.width}x${s.height}`;
+
+    const pos = document.createElement("div");
+    pos.className = "monitor-pos";
+    pos.textContent = `x=${s.x} y=${s.y}`;
+
+    el.appendChild(num);
+    el.appendChild(nameEl);
+    el.appendChild(info);
+    el.appendChild(pos);
+
+    if (s.primary) {
+      const badge = document.createElement("div");
+      badge.className = "monitor-badge";
+      badge.textContent = "PRIMARY";
+      el.appendChild(badge);
+    }
+
+    cfgScreens.appendChild(el);
+  }
+};
+
 const refreshScreens = async () => {
   if (!api?.GetScreens) {
     availableScreens = [];
@@ -150,15 +227,92 @@ const refreshScreens = async () => {
   try {
     const screens = await api.GetScreens();
     availableScreens = Array.isArray(screens) ? screens : [];
-    if (cfgScreens) {
-      cfgScreens.textContent = availableScreens.length
-        ? availableScreens.map(screenLabel).join("\n")
-        : "No screens detected";
-    }
+    renderScreenViz(availableScreens);
   } catch (err) {
     availableScreens = [];
     if (cfgScreens) cfgScreens.textContent = err.message || String(err);
   }
+};
+
+const renderMonitorPicker = (container, selected) => {
+  if (!container) return;
+
+  if (!availableScreens.length) {
+    container.textContent = "No screens";
+    container.style.height = "";
+    return;
+  }
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const s of availableScreens) {
+    if (s.x < minX) minX = s.x;
+    if (s.y < minY) minY = s.y;
+    if (s.x + s.width > maxX) maxX = s.x + s.width;
+    if (s.y + s.height > maxY) maxY = s.y + s.height;
+  }
+
+  const virtW = maxX - minX;
+  const virtH = maxY - minY;
+  if (virtW <= 0 || virtH <= 0) {
+    container.textContent = "No screens";
+    container.style.height = "";
+    return;
+  }
+
+  const availW = Math.max(Math.min(container.clientWidth || 240, 240), 80);
+  const maxH = 70;
+  const scale = Math.min(availW / virtW, maxH / virtH);
+
+  container.innerHTML = "";
+  container.style.position = "relative";
+  container.style.height = Math.round(virtH * scale) + "px";
+
+  let current = Number(selected) || 0;
+  if (current <= 0) {
+    const primary = availableScreens.find((s) => s.primary);
+    if (primary) current = primary.index;
+  }
+
+  for (const s of availableScreens) {
+    const left = (s.x - minX) * scale;
+    const top = (s.y - minY) * scale;
+    const w = Math.max(s.width * scale - 4, 24);
+    const h = Math.max(s.height * scale - 4, 16);
+
+    const el = document.createElement("div");
+    el.className = "monitor-pick";
+    el.style.cssText = `left:${left}px;top:${top}px;width:${w}px;height:${h}px`;
+    el.title = s.name || `Screen ${s.index}`;
+
+    if (current === s.index) {
+      el.classList.add("selected");
+    }
+
+    const num = document.createElement("div");
+    num.className = "monitor-pick-num";
+    num.textContent = s.index;
+    el.appendChild(num);
+
+    if (s.primary) {
+      const badge = document.createElement("div");
+      badge.className = "monitor-pick-badge";
+      badge.textContent = "P";
+      el.appendChild(badge);
+    }
+
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      container.querySelectorAll(".monitor-pick").forEach((m) => m.classList.remove("selected"));
+      el.classList.add("selected");
+      const input = container.closest("label")?.querySelector('[data-f="screen"]');
+      if (input) input.value = String(s.index);
+    });
+
+    container.appendChild(el);
+  }
+
+  const input = container.closest("label")?.querySelector('[data-f="screen"]');
+  if (input) input.value = String(current);
 };
 
 const buildScreenOptions = (selected) => {
@@ -595,6 +749,15 @@ restartAllBtn.addEventListener("click", async () => {
   }
 });
 
+stopAllBtn.addEventListener("click", async () => {
+  if (!api) return;
+  try {
+    await api.StopAll();
+  } catch (err) {
+    console.error(err);
+  }
+});
+
 killCMDBtn.addEventListener("click", async () => {
   if (!api) return;
   try {
@@ -710,9 +873,8 @@ const buildProcessRow = (p = {}) => {
         <input data-f="args" value="${escapeAttr(p.args)}" />
       </label>
       <label>Screen
-        <select data-f="screen">
-          ${buildScreenOptions(p.screen)}
-        </select>
+        <input data-f="screen" type="hidden" value="${Number(p.screen) || 0}" />
+        <div class="monitor-picker"></div>
       </label>
       <label>CheckProcess
         <input data-f="checkProcess" value="${escapeAttr(p.checkProcess)}" />
@@ -737,6 +899,9 @@ const buildProcessRow = (p = {}) => {
       <button data-action="remove">Remove</button>
     </div>
   `;
+  const picker = card.querySelector('.monitor-picker');
+  if (picker) renderMonitorPicker(picker, p.screen);
+
   const typeSelect = card.querySelector('select[data-f="type"]');
   typeSelect.value = initialType;
   typeSelect.addEventListener("change", () => {

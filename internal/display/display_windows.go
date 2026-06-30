@@ -38,10 +38,12 @@ var (
 )
 
 const (
-	monitorinfofPrimary = 0x00000001
-	gwOwner             = 4
-	swpNoZOrder         = 0x0004
-	swpShowWindow       = 0x0040
+	monitorinfofPrimary  = 0x00000001
+	gwOwner              = 4
+	swpNoZOrder          = 0x0004
+	swpNoActivate        = 0x0010
+	swpShowWindow        = 0x0040
+	swpNoSendChanging    = 0x0400
 )
 
 func ListScreens() ([]Screen, error) {
@@ -110,7 +112,7 @@ func MoveProcessWindowToScreen(pid int, screenIndex int) error {
 		uintptr(int32(screen.Y)),
 		uintptr(int32(screen.Width)),
 		uintptr(int32(screen.Height)),
-		uintptr(swpNoZOrder|swpShowWindow),
+		uintptr(swpNoZOrder|swpShowWindow|swpNoActivate),
 	)
 	if ret == 0 {
 		return err

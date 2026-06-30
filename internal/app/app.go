@@ -113,7 +113,7 @@ func (a *App) Run(ctx context.Context) error {
 			}
 			now := time.Now()
 			a.maybeAutoRestart(now)
-			statuses = a.computeStatuses(false, now)
+			statuses = a.computeStatuses(true, now)
 			a.render(statuses)
 		case <-restartTicker.C:
 			if !a.IsCheckProcessRunning() {
@@ -172,7 +172,7 @@ func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot
 			}
 			now := time.Now()
 			a.maybeAutoRestart(now)
-			statuses = a.computeStatuses(false, now)
+			statuses = a.computeStatuses(true, now)
 			netDbg := ""
 			if a.cfg.Settings.NetDebug {
 				netDbg = process.NetDebug()
@@ -760,10 +760,16 @@ func (a *App) StopAll() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	var lastErr error
-	for _, item := range a.cfg.Process {
+	for name, item := range a.cfg.Process {
 		if err := stopProcessItem(item); err != nil {
 			lastErr = err
 		}
+		if a.defaultDisabled[name] {
+			item.Disabled = true
+		}
+		a.manualStop[name] = true
+		delete(a.restartAt, name)
+		delete(a.firstStart, name)
 	}
 	return lastErr
 }
@@ -1065,6 +1071,14 @@ func (a *App) maybeAutoRestart(now time.Time) {
 	}
 	target := time.Date(now.Year(), now.Month(), now.Day(), clock.hour, clock.min, clock.sec, 0, now.Location())
 	if now.Before(target) {
+		return
+	}
+	// Skip immediate restart on the very first check (cold start).
+	// firstStart processes will be started by computeStatuses with delayStartTime.
+	if lastDay == 0 {
+		a.mu.Lock()
+		a.autoRestart.lastDay = today
+		a.mu.Unlock()
 		return
 	}
 	if err := a.RestartAll(); err != nil {
