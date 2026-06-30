@@ -811,20 +811,19 @@ cfgFind.addEventListener("keydown", (e) => {
   }
 });
 
-const clearFinder = (model, newModel) => {
+const clearFinder = (model) => {
   cfgFind.value = "";
 
-  newModel.settings = model.settings;
+  model.settings = collectConfig().settings;
 };
 
 saveBtn.addEventListener("click", async () => {
   if (!api) return;
   if (!unlocked) return;
   try {
-    const model = collectConfig();
-
-    clearFinder(model, currentConfigModel);
+    clearFinder(currentConfigModel);
     renderConfig(currentConfigModel);
+    const model = collectConfig();
 
     await api.SaveConfigModel(model);
   } catch (err) {
