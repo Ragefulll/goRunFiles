@@ -640,7 +640,6 @@ toggleConsoleBtn.addEventListener("click", () => {
 
 const renderConfig = (model) => {
   if (!model) return;
-
   currentConfigModel = model;
 
   const s = model.settings || {};
@@ -812,11 +811,21 @@ cfgFind.addEventListener("keydown", (e) => {
   }
 });
 
+const clearFinder = (model, newModel) => {
+  cfgFind.value = "";
+
+  newModel.settings = model.settings;
+};
+
 saveBtn.addEventListener("click", async () => {
   if (!api) return;
   if (!unlocked) return;
   try {
     const model = collectConfig();
+
+    clearFinder(model, currentConfigModel);
+    renderConfig(currentConfigModel);
+
     await api.SaveConfigModel(model);
   } catch (err) {
     alert(err.message || String(err));
