@@ -30,3 +30,15 @@ func hideCursor() {
 	}
 	_, _, _ = procSetConsoleCursorInfo.Call(uintptr(h), uintptr(unsafe.Pointer(&info)))
 }
+
+func showCursor() {
+	h, err := windows.GetStdHandle(windows.STD_OUTPUT_HANDLE)
+	if err != nil {
+		return
+	}
+	info := consoleCursorInfo{
+		Size:    1,
+		Visible: 1,
+	}
+	_, _, _ = procSetConsoleCursorInfo.Call(uintptr(h), uintptr(unsafe.Pointer(&info)))
+}

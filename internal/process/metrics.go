@@ -99,6 +99,37 @@ var (
 
 const minRateSampleWindow = 250 * time.Millisecond
 
+const staleSampleTTL = 5 * time.Minute
+
+// CleanupStaleSamples removes entries for PIDs that haven't been sampled recently.
+func CleanupStaleSamples() {
+	now := time.Now()
+
+	cpuMu.Lock()
+	for pid, s := range cpuSamples {
+		if now.Sub(s.at) > staleSampleTTL {
+			delete(cpuSamples, pid)
+		}
+	}
+	cpuMu.Unlock()
+
+	netMu.Lock()
+	for pid, s := range netSamples {
+		if now.Sub(s.at) > staleSampleTTL {
+			delete(netSamples, pid)
+		}
+	}
+	netMu.Unlock()
+
+	ioMu.Lock()
+	for pid, s := range ioSamples {
+		if now.Sub(s.at) > staleSampleTTL {
+			delete(ioSamples, pid)
+		}
+	}
+	ioMu.Unlock()
+}
+
 func cpuPercentFromSample(pid int, now time.Time, total float64) float64 {
 	cpuMu.Lock()
 	defer cpuMu.Unlock()
@@ -133,7 +164,7 @@ func NetKBs(pid int) float64 {
 		return 0
 	}
 	now := time.Now()
-	pids := processTreePIDs(pid)
+	pids := ProcessTreePIDs(pid)
 	if len(pids) == 0 {
 		return 0
 	}
@@ -164,7 +195,7 @@ func NetIOKBs(pid int) (float64, float64) {
 		return 0, 0
 	}
 	now := time.Now()
-	pids := processTreePIDs(pid)
+	pids := ProcessTreePIDs(pid)
 	if len(pids) == 0 {
 		return 0, 0
 	}
@@ -313,7 +344,7 @@ func IOKBs(pid int) float64 {
 		return 0
 	}
 	now := time.Now()
-	pids := processTreePIDs(pid)
+	pids := ProcessTreePIDs(pid)
 	if len(pids) == 0 {
 		return 0
 	}
@@ -383,7 +414,8 @@ func ioRateFromSample(pid int, now time.Time, total uint64) float64 {
 	return rate
 }
 
-func processTreePIDs(root int) []int {
+// ProcessTreePIDs returns the PID of root and all its descendant processes.
+func ProcessTreePIDs(root int) []int {
 	if root <= 0 {
 		return nil
 	}
@@ -442,7 +474,7 @@ func addPIDWithFamily(pid int, seen map[int]bool, out *[]int) {
 		return
 	}
 	// Include the process itself and its descendants.
-	for _, p := range processTreePIDs(pid) {
+	for _, p := range ProcessTreePIDs(pid) {
 		if p <= 0 || seen[p] {
 			continue
 		}

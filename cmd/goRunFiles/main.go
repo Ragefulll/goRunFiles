@@ -21,7 +21,7 @@ func main() {
 		}
 	}
 
-	log.Println(config.Banner)
+	log.Print(config.Banner)
 
 	cfg, err := config.Load(configPath)
 	if err != nil {

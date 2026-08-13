@@ -568,6 +568,33 @@ func anyToUint64(v interface{}) uint64 {
 	}
 }
 
+// CleanupETWTotals removes stale PID entries from the ETW totals map.
+func CleanupETWTotals() {
+	etwMu.Lock()
+	// ETW accumulates bytes, so just cap the map size to prevent unbounded growth.
+	// If the map exceeds 1000 entries, remove the oldest 20%.
+	if len(etwTotals) > 1000 {
+		type kv struct {
+			pid int
+			b   uint64
+		}
+		list := make([]kv, 0, len(etwTotals))
+		for pid, b := range etwTotals {
+			list = append(list, kv{pid: pid, b: b})
+		}
+		// Remove PIDs with lowest byte counts (likely inactive).
+		sort.Slice(list, func(i, j int) bool { return list[i].b < list[j].b })
+		removeCount := len(list) / 5
+		if removeCount < 1 {
+			removeCount = 1
+		}
+		for i := 0; i < removeCount; i++ {
+			delete(etwTotals, list[i].pid)
+		}
+	}
+	etwMu.Unlock()
+}
+
 // etwTotalBytes returns total bytes per pid from ETW.
 func etwTotalBytes(pid int) (uint64, bool) {
 	if !etwRunning.Load() {

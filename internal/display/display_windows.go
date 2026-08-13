@@ -8,7 +8,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/shirou/gopsutil/v3/process"
+	"goRunFiles/internal/process"
 )
 
 type rect struct {
@@ -95,7 +95,7 @@ func MoveProcessWindowToScreen(pid int, screenIndex int) error {
 	var hwnd uintptr
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
-		hwnd = findMainWindow(processTreePIDs(pid))
+		hwnd = findMainWindow(process.ProcessTreePIDs(pid))
 		if hwnd != 0 {
 			break
 		}
@@ -150,35 +150,4 @@ func findMainWindow(targetPIDs []int) uintptr {
 	})
 	procEnumWindows.Call(cb, 0)
 	return found
-}
-
-func processTreePIDs(root int) []int {
-	if root <= 0 {
-		return nil
-	}
-	seen := map[int]bool{root: true}
-	out := []int{root}
-	queue := []int{root}
-	for len(queue) > 0 {
-		cur := queue[0]
-		queue = queue[1:]
-		p, err := process.NewProcess(int32(cur))
-		if err != nil {
-			continue
-		}
-		children, err := p.Children()
-		if err != nil {
-			continue
-		}
-		for _, child := range children {
-			pid := int(child.Pid)
-			if pid <= 0 || seen[pid] {
-				continue
-			}
-			seen[pid] = true
-			out = append(out, pid)
-			queue = append(queue, pid)
-		}
-	}
-	return out
 }

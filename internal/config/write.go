@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 )
@@ -90,7 +89,7 @@ func WriteFromDTO(path string, dto ConfigDTO) error {
 		b.WriteString(fmt.Sprintf("errorWindowTitles=%s\n", quoteIfNeeded(dto.Settings.ErrorWindowTitles)))
 	}
 
-	return os.WriteFile(path, []byte(b.String()), 0644)
+	return atomicWrite(path, []byte(b.String()))
 }
 
 func quoteIfNeeded(s string) string {

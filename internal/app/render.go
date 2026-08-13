@@ -131,29 +131,29 @@ func (a *App) render(statuses []procStatus) {
 }
 
 func formatRow(cols []string, widths []int) string {
-	out := ""
+	var b strings.Builder
 	for i, c := range cols {
 		if i > 0 {
-			out += "  "
+			b.WriteString("  ")
 		}
-		out += padRight(c, widths[i])
+		b.WriteString(padRight(c, widths[i]))
 	}
-	return out
+	return b.String()
 }
 
 func formatRowWithColors(cols []string, widths []int, colorFn func(col int, text string) string) string {
-	out := ""
+	var b strings.Builder
 	for i, c := range cols {
 		if i > 0 {
-			out += "  "
+			b.WriteString("  ")
 		}
 		padded := padRight(c, widths[i])
 		if colorFn != nil {
 			padded = colorFn(i, padded)
 		}
-		out += padded
+		b.WriteString(padded)
 	}
-	return out
+	return b.String()
 }
 
 func dividerRow(widths []int) []string {

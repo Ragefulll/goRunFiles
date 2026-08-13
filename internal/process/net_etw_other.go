@@ -9,6 +9,9 @@ func StartETWNetwork() error {
 	return fmt.Errorf("etw network requires windows+cgo build")
 }
 
+// CleanupETWTotals is a no-op on non-windows.
+func CleanupETWTotals() {}
+
 func etwTotalBytes(pid int) (uint64, bool) {
 	return 0, false
 }

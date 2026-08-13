@@ -37,6 +37,7 @@ type App struct {
 	manualStop      map[string]bool
 	autoRestart     autoRestartConfig
 	checkProcess    bool
+	onUpdateCb      func(DisplaySnapshot)
 	mu              sync.Mutex
 }
 
@@ -90,6 +91,7 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	hideCursor()
+	defer showCursor()
 
 	now := time.Now()
 	a.maybeAutoRestart(now)
@@ -126,6 +128,18 @@ func (a *App) Run(ctx context.Context) error {
 	}
 }
 
+// notifySnapshot builds a DisplaySnapshot and delivers it via the callback.
+func (a *App) notifySnapshot(statuses []procStatus, now time.Time, checkRunning bool) {
+	netDbg := ""
+	if a.cfg.Settings.NetDebug {
+		netDbg = process.NetDebug()
+	}
+	onUpdate := a.onUpdateCb
+	if onUpdate != nil {
+		onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.CheckTiming.Duration, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg, checkRunning))
+	}
+}
+
 // RunWithObserver runs the monitor loop and reports snapshots via callback.
 func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot)) error {
 	if ctx == nil {
@@ -141,14 +155,12 @@ func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot
 		return fmt.Errorf("onUpdate is nil")
 	}
 
+	a.onUpdateCb = onUpdate
+
 	now := time.Now()
 	a.maybeAutoRestart(now)
 	statuses := a.computeStatuses(true, now)
-	netDbg := ""
-	if a.cfg.Settings.NetDebug {
-		netDbg = process.NetDebug()
-	}
-	onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.CheckTiming.Duration, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg, a.IsCheckProcessRunning()))
+	a.notifySnapshot(statuses, now, a.IsCheckProcessRunning())
 
 	checkTicker := time.NewTicker(a.cfg.Settings.CheckTiming.Duration)
 	defer checkTicker.Stop()
@@ -161,41 +173,25 @@ func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-checkTicker.C:
-			if !a.IsCheckProcessRunning() {
-				now := time.Now()
-				netDbg := ""
-				if a.cfg.Settings.NetDebug {
-					netDbg = process.NetDebug()
-				}
-				onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.CheckTiming.Duration, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg, false))
+			running := a.IsCheckProcessRunning()
+			if !running {
+				a.notifySnapshot(statuses, time.Now(), false)
 				continue
 			}
 			now := time.Now()
 			a.maybeAutoRestart(now)
 			statuses = a.computeStatuses(true, now)
-			netDbg := ""
-			if a.cfg.Settings.NetDebug {
-				netDbg = process.NetDebug()
-			}
-			onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.CheckTiming.Duration, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg, true))
+			a.notifySnapshot(statuses, now, true)
 		case <-restartTicker.C:
-			if !a.IsCheckProcessRunning() {
-				now := time.Now()
-				netDbg := ""
-				if a.cfg.Settings.NetDebug {
-					netDbg = process.NetDebug()
-				}
-				onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.CheckTiming.Duration, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg, false))
+			running := a.IsCheckProcessRunning()
+			if !running {
+				a.notifySnapshot(statuses, time.Now(), false)
 				continue
 			}
 			now := time.Now()
 			a.maybeAutoRestart(now)
 			statuses = a.computeStatuses(true, now)
-			netDbg := ""
-			if a.cfg.Settings.NetDebug {
-				netDbg = process.NetDebug()
-			}
-			onUpdate(buildDisplaySnapshot(a.version, statuses, now, a.cfg.Settings.CheckTiming.Duration, a.cfg.Settings.NetUnit, process.NetSource(), process.NetSourceError(), netDbg, true))
+			a.notifySnapshot(statuses, now, true)
 		}
 	}
 }
@@ -223,7 +219,10 @@ func (a *App) IsCheckProcessRunning() bool {
 
 func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 	a.mu.Lock()
-	defer a.mu.Unlock()
+
+	// Periodic cleanup of stale metric samples to prevent unbounded memory growth.
+	process.CleanupStaleSamples()
+	process.CleanupETWTotals()
 
 	if a.cfg.Settings.AutoCloseErrorDialogs {
 		titles := parseCSV(a.cfg.Settings.ErrorWindowTitles)
@@ -514,6 +513,10 @@ func (a *App) computeStatuses(doRestart bool, now time.Time) []procStatus {
 		statuses = append(statuses, status)
 	}
 
+	// Release the mutex before metric collection to avoid blocking other operations.
+	// gpuByPid is a local snapshot and statuses is only written here, so this is safe.
+	a.mu.Unlock()
+
 	if len(metricTasks) > 0 {
 		maxMetricWorkers := runtime.NumCPU()
 		if maxMetricWorkers < 4 {
@@ -735,6 +738,37 @@ func (a *App) RestartAll() error {
 		delete(a.firstStart, name)
 		if pid > 0 {
 			a.startTimes[pid] = time.Now().UnixMilli()
+		}
+	}
+	return lastErr
+}
+
+// restartAllDelayed stops all enabled processes and schedules their restart,
+// respecting each process's DelayStartTime. Processes with a zero delay are
+// scheduled to start immediately; actual launching happens in the monitor loop.
+func (a *App) restartAllDelayed(now time.Time) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	var lastErr error
+	a.manualStop = make(map[string]bool)
+	for _, item := range a.cfg.Process {
+		if item.Disabled {
+			continue
+		}
+		if err := stopProcessItem(item); err != nil {
+			lastErr = err
+		}
+	}
+	for name, item := range a.cfg.Process {
+		if item.Disabled {
+			continue
+		}
+		delete(a.firstStart, name)
+		if d := item.DelayStartTime.Duration; d > 0 {
+			a.restartAt[name] = now.Add(d)
+		} else {
+			a.restartAt[name] = now
 		}
 	}
 	return lastErr
@@ -1019,9 +1053,6 @@ func formatCountdown(d time.Duration) string {
 }
 
 func buildBatTarget(item *config.ProcessItem) string {
-	if item.Args == "" {
-		return item.Process
-	}
 	return item.Process
 }
 
@@ -1050,43 +1081,36 @@ func (a *App) applyAutoRestartSettings(cfg config.Config) {
 
 func (a *App) maybeAutoRestart(now time.Time) {
 	a.mu.Lock()
-	enabled := a.autoRestart.enabled
-	parseErr := a.autoRestart.parseErr
-	clock := a.autoRestart.clock
-	lastDay := a.autoRestart.lastDay
-	a.mu.Unlock()
-	if !enabled {
+	defer a.mu.Unlock()
+
+	if !a.autoRestart.enabled {
 		return
 	}
-	if parseErr != nil {
-		a.logger.Printf("%s autorestart disabled: %v", LogTag, parseErr)
-		a.mu.Lock()
+	if a.autoRestart.parseErr != nil {
+		a.logger.Printf("%s autorestart disabled: %v", LogTag, a.autoRestart.parseErr)
 		a.autoRestart.enabled = false
-		a.mu.Unlock()
 		return
 	}
 	today := dateKey(now)
-	if lastDay == today {
+	if a.autoRestart.lastDay == today {
 		return
 	}
-	target := time.Date(now.Year(), now.Month(), now.Day(), clock.hour, clock.min, clock.sec, 0, now.Location())
+	target := time.Date(now.Year(), now.Month(), now.Day(), a.autoRestart.clock.hour, a.autoRestart.clock.min, a.autoRestart.clock.sec, 0, now.Location())
 	if now.Before(target) {
 		return
 	}
 	// Skip immediate restart on the very first check (cold start).
-	// firstStart processes will be started by computeStatuses with delayStartTime.
-	if lastDay == 0 {
-		a.mu.Lock()
+	if a.autoRestart.lastDay == 0 {
 		a.autoRestart.lastDay = today
-		a.mu.Unlock()
 		return
 	}
-	if err := a.RestartAll(); err != nil {
+	// Release lock during restart to avoid holding it across process operations.
+	a.mu.Unlock()
+	if err := a.restartAllDelayed(now); err != nil {
 		a.logger.Printf("%s autorestart error: %v", LogTag, err)
 	}
 	a.mu.Lock()
 	a.autoRestart.lastDay = today
-	a.mu.Unlock()
 }
 
 func parseDayClock(raw string) (dayClock, error) {

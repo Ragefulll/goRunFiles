@@ -2,7 +2,6 @@ package runner
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -33,6 +32,7 @@ func Start(item *config.ProcessItem, launchInNewConsole bool) (int, error) {
 		if err := cmd.Start(); err != nil {
 			return 0, err
 		}
+		go cmd.Wait()
 		moveWindowAsync(cmd.Process.Pid, item.Screen)
 		return cmd.Process.Pid, nil
 	case config.TypeCmd:
@@ -48,6 +48,7 @@ func Start(item *config.ProcessItem, launchInNewConsole bool) (int, error) {
 		if err := cmd.Start(); err != nil {
 			return 0, err
 		}
+		go cmd.Wait()
 		moveWindowAsync(cmd.Process.Pid, item.Screen)
 		return cmd.Process.Pid, nil
 	case config.TypeBat:
@@ -75,6 +76,7 @@ func Start(item *config.ProcessItem, launchInNewConsole bool) (int, error) {
 		if err := cmd.Start(); err != nil {
 			return 0, err
 		}
+		go cmd.Wait()
 		moveWindowAsync(cmd.Process.Pid, item.Screen)
 		return cmd.Process.Pid, nil
 	default:
@@ -87,27 +89,20 @@ func moveWindowAsync(pid int, screen int) {
 		return
 	}
 	go func() {
-		if err := display.MoveProcessWindowToScreen(pid, screen); err != nil {
-			log.Printf("moveWindowAsync: pid=%d screen=%d error: %v", pid, screen, err)
-		}
+		_ = display.MoveProcessWindowToScreen(pid, screen)
 	}()
 }
 
 func injectWindowPosition(args []string, screen int, processPath string) []string {
-	log.Printf("[injectWindowPosition] screen=%d args=%q", screen, args)
 	if screen <= 0 || len(args) == 0 {
-		log.Printf("[injectWindowPosition] early return: screen=%d args_len=%d", screen, len(args))
 		return args
 	}
 	screens, err := display.ListScreens()
-	log.Printf("[injectWindowPosition] ListScreens: count=%d err=%v", len(screens), err)
 	if err != nil || screen > len(screens) {
-		log.Printf("[injectWindowPosition] screen out of range or err: screen=%d screens_count=%d err=%v", screen, len(screens), err)
 		return args
 	}
 	target := screens[screen-1]
 	pos := fmt.Sprintf("--window-position=%d,%d", target.X, target.Y)
-	log.Printf("[injectWindowPosition] target screen index=%d pos=%s", screen-1, pos)
 	out := make([]string, 0, len(args)+2)
 	replaced := false
 	hasUserDataDir := false
@@ -125,18 +120,13 @@ func injectWindowPosition(args []string, screen int, processPath string) []strin
 	if !replaced {
 		out = append(out, pos)
 	}
-	// Chrome single-instance workaround: force separate instance so that
-	// --window-position is actually honoured and moveWindowAsync can find
-	// the real browser PID in the process tree.
 	if !hasUserDataDir {
 		exe := strings.ToLower(filepath.Base(processPath))
 		if exe == "chrome.exe" {
 			userDir := fmt.Sprintf(`--user-data-dir=%s\art3d-chrome-%d`, os.TempDir(), screen)
 			out = append(out, userDir, "--no-first-run")
-			log.Printf("[injectWindowPosition] added %s for separate Chrome instance", userDir)
 		}
 	}
-	log.Printf("[injectWindowPosition] final args=%q", out)
 	return out
 }
 
@@ -145,5 +135,36 @@ func splitArgs(raw string) []string {
 	if raw == "" {
 		return nil
 	}
-	return strings.Fields(raw)
+	var args []string
+	var current strings.Builder
+	inQuote := false
+	quoteChar := byte(0)
+	for i := 0; i < len(raw); i++ {
+		ch := raw[i]
+		if inQuote {
+			if ch == quoteChar {
+				inQuote = false
+				continue
+			}
+			current.WriteByte(ch)
+		} else {
+			if ch == '"' || ch == '\'' {
+				inQuote = true
+				quoteChar = ch
+				continue
+			}
+			if ch == ' ' || ch == '\t' {
+				if current.Len() > 0 {
+					args = append(args, current.String())
+					current.Reset()
+				}
+				continue
+			}
+			current.WriteByte(ch)
+		}
+	}
+	if current.Len() > 0 {
+		args = append(args, current.String())
+	}
+	return args
 }

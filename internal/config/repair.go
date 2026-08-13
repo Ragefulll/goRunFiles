@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -55,7 +56,34 @@ func RepairFile(path string) (bool, error) {
 	if !changed {
 		return false, nil
 	}
-	return true, os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0644)
+	if err := atomicWrite(path, []byte(strings.Join(lines, "\n"))); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func atomicWrite(path string, data []byte) error {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, "*.ini.tmp")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	return os.Rename(tmpPath, path)
 }
 
 func escapeBackslashes(s string) string {
