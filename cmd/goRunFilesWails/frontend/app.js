@@ -12,6 +12,7 @@ const reloadBtn                 = document.getElementById("reloadConfig");
 const saveBtn                   = document.getElementById("saveConfig");
 const toggleBtn                 = document.getElementById("toggleConfig");
 const restartAllBtn             = document.getElementById("restartAll");
+const restartAutoManualBtn      = document.getElementById("restartAutoManual");
 const stopAllBtn                = document.getElementById("stopAll");
 const killCMDBtn                = document.getElementById("killCMD");
 const toggleCheckProcessBtn     = document.getElementById("toggleCheckProcess");
@@ -744,6 +745,15 @@ restartAllBtn.addEventListener("click", async () => {
   if (!api) return;
   try {
     await api.RestartAll();
+  } catch (err) {
+    console.error(err);
+  }
+});
+
+restartAutoManualBtn.addEventListener("click", async () => {
+  if (!api) return;
+  try {
+    await api.RestartAutoManual();
   } catch (err) {
     console.error(err);
   }

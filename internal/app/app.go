@@ -764,7 +764,6 @@ func (a *App) restartAllDelayed(now time.Time) error {
 		if item.Disabled {
 			continue
 		}
-		delete(a.firstStart, name)
 		if d := item.DelayStartTime.Duration; d > 0 {
 			a.restartAt[name] = now.Add(d)
 		} else {
@@ -772,6 +771,13 @@ func (a *App) restartAllDelayed(now time.Time) error {
 		}
 	}
 	return lastErr
+}
+
+// RestartAutoManual triggers the auto-restart sequence immediately,
+// bypassing the daily clock guard. Useful for testing the auto-restart
+// mechanics and DelayStartTime behaviour.
+func (a *App) RestartAutoManual() error {
+	return a.restartAllDelayed(time.Now())
 }
 
 // GetProcessPath returns configured working path for process by config name.
@@ -1096,12 +1102,20 @@ func (a *App) maybeAutoRestart(now time.Time) {
 		return
 	}
 	target := time.Date(now.Year(), now.Month(), now.Day(), a.autoRestart.clock.hour, a.autoRestart.clock.min, a.autoRestart.clock.sec, 0, now.Location())
-	if now.Before(target) {
+	// Cold start: first check after launch. Must run BEFORE the
+	// now.Before(target) guard, otherwise lastDay stays 0 until the
+	// target time and then the cold-start skip fires instead of the restart.
+	if a.autoRestart.lastDay == 0 {
+		if now.Before(target) {
+			// Started before target — permit today's trigger.
+			a.autoRestart.lastDay = -1
+		} else {
+			// Started after target — skip today.
+			a.autoRestart.lastDay = today
+		}
 		return
 	}
-	// Skip immediate restart on the very first check (cold start).
-	if a.autoRestart.lastDay == 0 {
-		a.autoRestart.lastDay = today
+	if now.Before(target) {
 		return
 	}
 	// Release lock during restart to avoid holding it across process operations.

@@ -205,6 +205,11 @@ func (g *GUI) StopAll() error {
 	return g.mon.StopAll()
 }
 
+// RestartAutoManual triggers the auto-restart sequence immediately.
+func (g *GUI) RestartAutoManual() error {
+	return g.mon.RestartAutoManual()
+}
+
 // KillCMD force-kills all cmd.exe processes.
 func (g *GUI) KillCMD() error {
 	return killImage("cmd.exe")
