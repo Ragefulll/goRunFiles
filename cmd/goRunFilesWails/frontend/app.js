@@ -663,10 +663,15 @@ const render = (data) => {
     if (!row) {
       row = createCard(name);
       rowMap.set(name, row);
+      const ref = containerChildByName(processCards, it.name);
+      if (ref) {
+        processCards.insertBefore(row.card, ref);
+      } else {
+        processCards.appendChild(row.card);
+      }
     }
     const prev = prevMap.get(name) || {};
     updateCard(row, it, prev, netUnit, netIsMB);
-    processCards.appendChild(row.card);
   }
 
   for (const [name, row] of rowMap.entries()) {
@@ -679,6 +684,16 @@ const render = (data) => {
     syncDrawer(selectedProcessName);
   }
   lastSnapshot = data;
+};
+
+const containerChildByName = (parent, name) => {
+  if (!parent) return null;
+  for (const child of parent.children) {
+    if (child.classList && child.classList.contains("process-card") && child.dataset.name === name) {
+      return child;
+    }
+  }
+  return null;
 };
 
 const setCheckProcessButton = (running) => {
@@ -1434,3 +1449,95 @@ document.addEventListener("change", (e) => {
     el.classList.add("pulse");
   }
 });
+
+// ---- Auto-update / version check ----
+
+const updateModal = document.getElementById("updateModal");
+const updateCardEl = document.getElementById("updateCard");
+const updateBg = document.getElementById("updateBg");
+const updateTitle = document.getElementById("updateTitle");
+const updateMsg = document.getElementById("updateMsg");
+const updateDetail = document.getElementById("updateDetail");
+const updatePct = document.getElementById("updatePct");
+const updateIcon = document.getElementById("updateIcon");
+
+const UPDATE_ICONS = {
+  spinner: '<svg class="spin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="40 20" /></svg>',
+  download: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10m0 0-4-4m4 4 4-4M5 17v1a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>',
+  check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" /></svg>',
+  alert: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5m0 3v.01M12 3 2.5 20h19L12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>',
+};
+
+let updateTimer = null;
+
+const hideUpdate = () => {
+  if (updateModal) updateModal.classList.add("hidden");
+};
+
+const showUpdateCard = (title, msg, detail, pct, cls, ico, indeterminate) => {
+  if (!updateModal) return;
+  updateModal.classList.remove("hidden");
+  if (updateCardEl) {
+    updateCardEl.classList.remove("ok", "error");
+    if (cls) updateCardEl.classList.add(cls);
+  }
+  if (updateBg) {
+    updateBg.classList.toggle("indeterminate", !!indeterminate);
+    updateBg.style.width = indeterminate ? "" : `${pct || 0}%`;
+  }
+  if (updateTitle) updateTitle.textContent = title;
+  if (updateMsg) updateMsg.textContent = msg;
+  if (updateDetail) updateDetail.textContent = detail || "";
+  if (updatePct) updatePct.textContent = pct || "";
+  if (updateIcon) updateIcon.innerHTML = UPDATE_ICONS[ico] || "";
+};
+
+function onUpdateStatus(ev) {
+  if (!ev || !ev.status) return;
+  if (updateTimer) {
+    clearTimeout(updateTimer);
+    updateTimer = null;
+  }
+  const cur = ev.current ? `v${ev.current}` : "-";
+  switch (ev.status) {
+    case "check":
+      showUpdateCard("Проверка обновлений", `Текущая версия: ${cur}`, "Подключение к серверу...", "", "", "spinner", true);
+      break;
+    case "downloading":
+      showUpdateCard("Доступно обновление", `Загружается версия v${ev.remote || ""}`, ev.detail || "", String(Math.round(ev.progress || 0)), "downloading", "download");
+      break;
+    case "restarting":
+      showUpdateCard("Установка обновления", "Файлы заменены, приложение перезапускается...", "", "100%", "restarting", "spinner");
+      break;
+    case "applied":
+      showUpdateCard("Обновление применено", `Установлена версия v${ev.current || ""}`, "", "100%", "ok", "check");
+      updateTimer = setTimeout(hideUpdate, 2000);
+      break;
+    case "idle":
+      showUpdateCard("Версия актуальна", `Установлена актуальная версия v${ev.current || ""}`, "", "100%", "ok", "check");
+      updateTimer = setTimeout(hideUpdate, 2000);
+      break;
+    default:
+      showUpdateCard("Ошибка", ev.detail || "Попробуйте позже", "", "100%", "error", "alert");
+      updateTimer = setTimeout(hideUpdate, 4500);
+  }
+}
+
+if (window.runtime && window.runtime.EventsOn) {
+  window.runtime.EventsOn("update-status", onUpdateStatus);
+}
+
+if (api && api.AppVersion) {
+  api.AppVersion().then((v) => {
+    if (v && elVersion) elVersion.textContent = v;
+  });
+}
+if (api && api.CheckUpdates) {
+  api.CheckUpdates();
+}
+api.GetUpdateStatus().then((st) => {
+  if (st && st.status && st.status !== "check" && st.status !== "downloading" && st.status !== "restarting") {
+    onUpdateStatus(st);
+  }
+});
+

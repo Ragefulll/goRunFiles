@@ -255,9 +255,30 @@ export namespace main {
 	        this.lastRunTime = source["lastRunTime"];
 	        this.lastTaskResult = source["lastTaskResult"];
 	        this.taskName = source["taskName"];
-	        this.error = source["error"];
-	    }
-	}
+this.error = source["error"];
+    }
+}
+
+export class UpdateStatus {
+    current: string;
+    remote: string;
+    status: string;
+    progress: number;
+    detail: string;
+
+    static createFrom(source: any = {}) {
+        return new UpdateStatus(source);
+    }
+
+    constructor(source: any = {}) {
+        if ('string' === typeof source) source = JSON.parse(source);
+        this.current = source["current"];
+        this.remote = source["remote"];
+        this.status = source["status"];
+        this.progress = source["progress"];
+        this.detail = source["detail"];
+    }
+}
 
 }
 

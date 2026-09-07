@@ -31,9 +31,22 @@ type GUI struct {
 	configPath string
 	mu         sync.RWMutex
 	snapshot   app.DisplaySnapshot
+	up         *updater
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "--version" {
+		fmt.Println(buildVersion)
+		return
+	}
+	if isSelfUpdate() {
+		if err := runSelfUpdate(); err != nil {
+			log.Printf("%s [ART3D-CHEKER]: update error: %v", app.LogTag, err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	configPath := resolveConfigPath()
 	cfg, err := config.Load(configPath)
 	if err != nil {
@@ -53,6 +66,7 @@ func main() {
 	gui := &GUI{
 		mon:        app.New(cfg, log.Default(), buildVersion),
 		configPath: configPath,
+		up:         &updater{},
 	}
 
 	err = wails.Run(&options.App{
@@ -63,6 +77,7 @@ func main() {
 			Assets: assets,
 		},
 		OnStartup: func(ctx context.Context) {
+			gui.up.ctx = ctx
 			go func() {
 				_ = gui.mon.RunWithObserver(ctx, gui.updateSnapshot)
 			}()
@@ -113,6 +128,21 @@ func (g *GUI) updateSnapshot(s app.DisplaySnapshot) {
 	g.mu.Lock()
 	g.snapshot = s
 	g.mu.Unlock()
+}
+
+// AppVersion returns the current application version.
+func (g *GUI) AppVersion() string {
+	return g.up.AppVersion()
+}
+
+// GetUpdateStatus returns the latest update status.
+func (g *GUI) GetUpdateStatus() UpdateStatus {
+	return g.up.GetUpdateStatus()
+}
+
+// CheckUpdates starts an asynchronous update check in the background.
+func (g *GUI) CheckUpdates() UpdateStatus {
+	return g.up.CheckUpdates()
 }
 
 // GetSnapshot returns the latest snapshot for UI polling.

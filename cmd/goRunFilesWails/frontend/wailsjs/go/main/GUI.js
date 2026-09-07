@@ -6,6 +6,18 @@ export function GetConfigModel() {
   return window['go']['main']['GUI']['GetConfigModel']();
 }
 
+export function AppVersion() {
+  return window['go']['main']['GUI']['AppVersion']();
+}
+
+export function GetUpdateStatus() {
+  return window['go']['main']['GUI']['GetUpdateStatus']();
+}
+
+export function CheckUpdates() {
+  return window['go']['main']['GUI']['CheckUpdates']();
+}
+
 export function GetSchedulerStatus() {
   return window['go']['main']['GUI']['GetSchedulerStatus']();
 }

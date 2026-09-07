@@ -7,6 +7,12 @@ import {app} from '../models';
 
 export function GetConfigModel():Promise<config.ConfigDTO>;
 
+export function AppVersion():Promise<string>;
+
+export function GetUpdateStatus():Promise<main.UpdateStatus>;
+
+export function CheckUpdates():Promise<main.UpdateStatus>;
+
 export function GetSchedulerStatus():Promise<main.TaskStatus>;
 
 export function GetScreens():Promise<Array<display.Screen>>;

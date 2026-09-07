@@ -66,10 +66,14 @@ if ($Gui) {
         $outputName = "goRunFiles"
       }
     }
-    $exeName = $outputName
+$exeName = $outputName
     if ($IsWindows) { $exeName = "$exeName.exe" }
     $guiExe = Join-Path $PSScriptRoot "cmd\goRunFilesWails\build\bin\$exeName"
     Copy-ConfigNextToExe $guiExe
+    $rootVersion = Join-Path $PSScriptRoot "version.txt"
+    if (Test-Path $rootVersion) {
+      Copy-Item $rootVersion (Join-Path (Split-Path -Parent $guiExe) "version.txt") -Force
+    }
   }
   exit $LASTEXITCODE
 }
