@@ -751,14 +751,19 @@ func (a *App) restartAllDelayed(now time.Time) error {
 	defer a.mu.Unlock()
 
 	var lastErr error
+	items := make([]*config.ProcessItem, 0, len(a.cfg.Process))
 	a.manualStop = make(map[string]bool)
 	for _, item := range a.cfg.Process {
 		if item.Disabled {
 			continue
 		}
+		items = append(items, item)
 		if err := stopProcessItem(item); err != nil {
 			lastErr = err
 		}
+	}
+	if err := waitForAllStopped(items, 30*time.Second); err != nil {
+		lastErr = err
 	}
 	for name, item := range a.cfg.Process {
 		if item.Disabled {
@@ -771,6 +776,38 @@ func (a *App) restartAllDelayed(now time.Time) error {
 		}
 	}
 	return lastErr
+}
+
+func waitForAllStopped(items []*config.ProcessItem, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	var lastErr error
+	for {
+		stillRunning := false
+		for _, item := range items {
+			if item == nil || item.Disabled {
+				continue
+			}
+			alive, _, err := isProcessItemAlive(item)
+			if err != nil {
+				lastErr = err
+				continue
+			}
+			if alive {
+				stillRunning = true
+				break
+			}
+		}
+		if !stillRunning {
+			return lastErr
+		}
+		if time.Now().After(deadline) {
+			if lastErr != nil {
+				return fmt.Errorf("timeout waiting for processes to stop: %w", lastErr)
+			}
+			return fmt.Errorf("timeout waiting for processes to stop")
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 }
 
 // RestartAutoManual triggers the auto-restart sequence immediately,

@@ -7,10 +7,11 @@ const elUpdated                 = document.getElementById("updated");
 const elVersion                 = document.getElementById("version");
 const elNetStatus               = document.getElementById("netStatus");
 const elNetDebug                = document.getElementById("netDebug");
-const tbody                     = document.getElementById("tbody");
+const processCards              = document.getElementById("processCards");
 const reloadBtn                 = document.getElementById("reloadConfig");
 const saveBtn                   = document.getElementById("saveConfig");
 const toggleBtn                 = document.getElementById("toggleConfig");
+const lockConfigBtn             = document.getElementById("lockConfigBtn");
 const restartAllBtn             = document.getElementById("restartAll");
 const restartAutoManualBtn      = document.getElementById("restartAutoManual");
 const stopAllBtn                = document.getElementById("stopAll");
@@ -27,6 +28,41 @@ const closeAuth                 = document.getElementById("closeAuth");
 const cancelAuth                = document.getElementById("cancelAuth");
 const configModal               = document.getElementById("configModal");
 const closeConfig               = document.getElementById("closeConfig");
+const lockConfigModalBtn        = document.getElementById("lockConfigModalBtn");
+const processDrawer             = document.getElementById("processDrawer");
+const closeDrawer               = document.getElementById("closeDrawer");
+const drawerTitle               = document.getElementById("drawerTitle");
+const drawerStatusChip          = document.getElementById("drawerStatusChip");
+const drawerStatusText          = document.getElementById("drawerStatusText");
+const drawerOpenFolder          = document.getElementById("drawerOpenFolder");
+const drawerRestart             = document.getElementById("drawerRestart");
+const drawerStop                = document.getElementById("drawerStop");
+const drawerStart               = document.getElementById("drawerStart");
+const drawerPid                 = document.getElementById("drawerPid");
+const drawerStarted             = document.getElementById("drawerStarted");
+const drawerUptime              = document.getElementById("drawerUptime");
+const drawerTarget              = document.getElementById("drawerTarget");
+const drawerCpu                 = document.getElementById("drawerCpu");
+const drawerGpu                 = document.getElementById("drawerGpu");
+const drawerMem                 = document.getElementById("drawerMem");
+const drawerNet                 = document.getElementById("drawerNet");
+const drawerIo                  = document.getElementById("drawerIo");
+const drawerName                = document.getElementById("drawerName");
+const drawerDisabled            = document.getElementById("drawerDisabled");
+const drawerType                = document.getElementById("drawerType");
+const drawerProcess             = document.getElementById("drawerProcess");
+const drawerPath                = document.getElementById("drawerPath");
+const drawerCommand             = document.getElementById("drawerCommand");
+const drawerArgs                = document.getElementById("drawerArgs");
+const drawerScreen              = document.getElementById("drawerScreen");
+const drawerScreenPicker        = document.getElementById("drawerScreenPicker");
+const drawerCheckProcess        = document.getElementById("drawerCheckProcess");
+const drawerCheckCmdline        = document.getElementById("drawerCheckCmdline");
+const drawerCheckCmdlineExclude = document.getElementById("drawerCheckCmdlineExclude");
+const drawerDelayStartTime      = document.getElementById("drawerDelayStartTime");
+const drawerMonitorHang         = document.getElementById("drawerMonitorHang");
+const drawerHangTimeout         = document.getElementById("drawerHangTimeout");
+const drawerSave                = document.getElementById("drawerSave");
 const errorConsoleContainer     = document.getElementById("errorConsoleContainer");
 const errorConsole              = document.getElementById("errorConsole");
 const schedulerTask             = document.getElementById("schedulerTask");
@@ -74,6 +110,27 @@ let checkProcessRunning = true;
 const rowMap = new Map();
 
 let currentConfigModel = null;
+let pendingProcessOpen = "";
+let pendingOpenConfig = false;
+let activeProcessName = "";
+let selectedProcessName = "";
+
+const STATUS_META = {
+  running: { label: "Running", icon: "▶", cls: "status-running" },
+  started: { label: "Starting", icon: "◔", cls: "status-started" },
+  stopped: { label: "Stopped", icon: "■", cls: "status-stopped" },
+  disabled: { label: "Disabled", icon: "⏸", cls: "status-disabled" },
+  hung: { label: "Hung", icon: "⚠", cls: "status-hung" },
+  unknown: { label: "Unknown", icon: "?", cls: "status-unknown" },
+};
+
+const ICONS = {
+  folder: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4h4.2a2 2 0 0 1 1.5.7l1 1.3H18.5A2.5 2.5 0 0 1 21 8.5v7A2.5 2.5 0 0 1 18.5 18h-13A2.5 2.5 0 0 1 3 15.5v-9Z"/></svg>`,
+  restart: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5a7 7 0 1 1-6.1 10.4M7 5H3v4"/><path d="M3 9c1.4-3.4 4.7-5.8 8.5-5.8A8.5 8.5 0 1 1 5.2 18.5"/></svg>`,
+  stop: `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="2.2"/></svg>`,
+  start: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5-11-6.5Z"/></svg>`,
+  lock: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 11V8.8a4.5 4.5 0 0 1 9 0V11"/><rect x="5" y="11" width="14" height="9" rx="2.2"/></svg>`,
+};
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
@@ -124,6 +181,13 @@ const buildSparkline = (values, color) => {
 const toFiniteOr = (v, fallback) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
+};
+
+const statusInfo = (it) => {
+  if (!it) return STATUS_META.unknown;
+  if (it.hung) return STATUS_META.hung;
+  if (it.disabled || it.status === "disabled") return STATUS_META.disabled;
+  return STATUS_META[it.status] || STATUS_META.unknown;
 };
 
 const escapeAttr = (value) => String(value ?? "")
@@ -401,153 +465,126 @@ const collectErrorLog = (data) => {
   }
 };
 
-const createRow = (name) => {
-  const tr = document.createElement("tr");
-  tr.dataset.name = name;
+const createCard = (name) => {
+  const card = document.createElement("article");
+  card.className = "process-card";
+  card.dataset.name = name;
+  card.innerHTML = `
+    <div class="process-card__bg">
+      <div class="metric-glow metric-glow--cpu"></div>
+      <div class="metric-glow metric-glow--gpu"></div>
+      <div class="metric-glow metric-glow--ram"></div>
+      <div class="metric-glow metric-glow--net"></div>
+      <div class="metric-glow metric-glow--io"></div>
+    </div>
+    <div class="process-card__top">
+      <div class="process-card__identity">
+        <div class="process-name"></div>
+        <div class="process-meta">
+          <span class="process-type"></span>
+          <span class="process-status"></span>
+        </div>
+      </div>
+      <div class="process-actions"></div>
+    </div>
+    <div class="process-card__main">
+      <div class="process-stat"><span>PID</span><strong class="process-pid"></strong></div>
+      <div class="process-stat"><span>Started</span><strong class="process-started"></strong></div>
+      <div class="process-stat"><span>Uptime</span><strong class="process-uptime"></strong></div>
+      <div class="process-stat full"><span>Target</span><strong class="process-target"></strong></div>
+    </div>
+    <div class="process-metrics">
+      <div class="metric-chip"><span>CPU</span><strong class="metric-val anim-cpu"></strong><div class="spark-wrap"></div></div>
+      <div class="metric-chip"><span>GPU</span><strong class="metric-val anim-gpu"></strong><div class="spark-wrap"></div></div>
+      <div class="metric-chip"><span>RAM</span><strong class="metric-val anim-ram"></strong><div class="spark-wrap"></div></div>
+      <div class="metric-chip"><span>NET</span><strong class="metric-val anim-net"></strong><div class="spark-wrap"></div></div>
+      <div class="metric-chip"><span>IO</span><strong class="metric-val anim-io"></strong><div class="spark-wrap"></div></div>
+    </div>
+  `;
 
-  const tdActions = document.createElement("td");
-  const label = document.createElement("label");
-  label.className = "action-toggle";
-  label.title = "Disabled";
   const checkbox = document.createElement("input");
   checkbox.className = "action-switch";
   checkbox.type = "checkbox";
   checkbox.dataset.action = "toggle-disabled";
   checkbox.dataset.name = name;
+
+  const label = document.createElement("label");
+  label.className = "action-toggle neon-toggle";
+  label.title = "Disabled";
   label.appendChild(checkbox);
-  tdActions.appendChild(label);
 
-  const btnFolder = document.createElement("button");
-  btnFolder.dataset.action = "open-folder";
-  btnFolder.dataset.name = name;
-  btnFolder.title = "Open folder";
-  btnFolder.textContent = "📁";
-  tdActions.appendChild(btnFolder);
-
-  const btnRestart = document.createElement("button");
-  btnRestart.dataset.action = "restart";
-  btnRestart.dataset.name = name;
-  btnRestart.textContent = "🔄️";
-  tdActions.appendChild(btnRestart);
-
-  const btnStop = document.createElement("button");
-  btnStop.dataset.action = "stop";
-  btnStop.dataset.name = name;
-  btnStop.textContent = "❌";
-  tdActions.appendChild(btnStop);
-
-  const btnStart = document.createElement("button");
-  btnStart.dataset.action = "start";
-  btnStart.dataset.name = name;
-  btnStart.textContent = "▶️";
-  tdActions.appendChild(btnStart);
-
-  const tdName = document.createElement("td");
-  const tdType = document.createElement("td");
-  const tdStatus = document.createElement("td");
-  tdStatus.className = "status";
-
-  const tdPid = document.createElement("td");
-  const pidSpan = document.createElement("span");
-  pidSpan.className = "anim-number anim-pid";
-  tdPid.appendChild(pidSpan);
-
-  const tdStarted = document.createElement("td");
-  const tdUptime = document.createElement("td");
-
-  const makeMetricCell = (className) => {
-    const td = document.createElement("td");
-    td.className = "metric";
-    const wrap = document.createElement("div");
-    wrap.className = "metric-wrap";
-    const val = document.createElement("span");
-    val.className = `metric-val anim-number ${className}`;
-    const spark = document.createElement("div");
-    spark.className = "spark-wrap";
-    wrap.appendChild(val);
-    wrap.appendChild(spark);
-    td.appendChild(wrap);
-    return { td, val, spark };
+  const actionWrap = card.querySelector(".process-actions");
+  const makeBtn = (action, title, cls) => {
+    const btn = document.createElement("button");
+    btn.className = `neon-btn neon-btn--icon ${cls}`.trim();
+    btn.dataset.action = action;
+    btn.dataset.name = name;
+    btn.title = title;
+    btn.setAttribute("aria-label", title);
+    btn.innerHTML = ICONS[action === "open-folder" ? "folder" : action] || "";
+    return btn;
   };
+  actionWrap.appendChild(label);
+  actionWrap.appendChild(makeBtn("open-folder", "Open folder", "neon-btn--folder"));
+  actionWrap.appendChild(makeBtn("restart", "Restart", "neon-btn--restart"));
+  actionWrap.appendChild(makeBtn("stop", "Stop", "neon-btn--stop"));
+  actionWrap.appendChild(makeBtn("start", "Start", "neon-btn--start"));
 
-  const cpuCell = makeMetricCell("anim-cpu");
-  const gpuCell = makeMetricCell("anim-gpu");
-  const memCell = makeMetricCell("anim-ram");
-  const netCell = makeMetricCell("anim-net");
-  const ioCell = makeMetricCell("anim-io");
-
-  const tdTarget = document.createElement("td");
-
-  tr.appendChild(tdActions);
-  tr.appendChild(tdName);
-  tr.appendChild(tdType);
-  tr.appendChild(tdStatus);
-  tr.appendChild(tdPid);
-  tr.appendChild(tdStarted);
-  tr.appendChild(tdUptime);
-  tr.appendChild(cpuCell.td);
-  tr.appendChild(gpuCell.td);
-  tr.appendChild(memCell.td);
-  tr.appendChild(netCell.td);
-  tr.appendChild(ioCell.td);
-  tr.appendChild(tdTarget);
+  const glows = card.querySelectorAll(".metric-glow");
+  const sparkWraps = card.querySelectorAll(".spark-wrap");
 
   return {
-    tr,
+    card,
     checkbox,
-    btnStart,
-    tdName,
-    tdType,
-    tdStatus,
-    pidSpan,
-    tdStarted,
-    tdUptime,
-    cpu: cpuCell,
-    gpu: gpuCell,
-    mem: memCell,
-    net: netCell,
-    io: ioCell,
-    tdTarget,
+    btnStart: actionWrap.querySelector('[data-action="start"]'),
+    nameEl: card.querySelector(".process-name"),
+    typeEl: card.querySelector(".process-type"),
+    statusEl: card.querySelector(".process-status"),
+    pidEl: card.querySelector(".process-pid"),
+    startedEl: card.querySelector(".process-started"),
+    uptimeEl: card.querySelector(".process-uptime"),
+    targetEl: card.querySelector(".process-target"),
+    cpu: { val: card.querySelector(".anim-cpu"), spark: sparkWraps[0], glow: glows[0] },
+    gpu: { val: card.querySelector(".anim-gpu"), spark: sparkWraps[1], glow: glows[1] },
+    mem: { val: card.querySelector(".anim-ram"), spark: sparkWraps[2], glow: glows[2] },
+    net: { val: card.querySelector(".anim-net"), spark: sparkWraps[3], glow: glows[3] },
+    io: { val: card.querySelector(".anim-io"), spark: sparkWraps[4], glow: glows[4] },
   };
 };
 
-const updateRow = (row, it, prev, netUnit, netIsMB) => {
-  if (it.hung) row.tr.classList.add("hung");
-  else row.tr.classList.remove("hung");
-  if (it.status === "disabled" || it.disabled) row.tr.classList.add("row-disabled");
-  else row.tr.classList.remove("row-disabled");
+const updateCard = (row, it, prev, netUnit, netIsMB) => {
+  row.card.classList.toggle("hung", !!it.hung);
+  row.card.classList.toggle("row-disabled", !!it.disabled || it.status === "disabled");
+  row.card.classList.toggle("status-running-bg", !it.hung && !it.disabled && it.status === "running");
+  row.card.classList.toggle("status-started-bg", !it.hung && !it.disabled && it.status === "started");
+  row.card.classList.toggle("status-stopped-bg", !it.hung && !it.disabled && (it.status === "stopped" || it.status === "unknown"));
+  row.card.classList.toggle("status-disabled-bg", !!it.disabled || it.status === "disabled");
 
   row.checkbox.checked = !!it.disabled;
-  const canStart = it.status !== "running" && it.status !== "started";
-  row.btnStart.disabled = !canStart;
+  row.btnStart.disabled = !(it.status !== "running" && it.status !== "started");
 
-  row.tdName.textContent = it.name || "";
-  row.tdType.textContent = it.type || "";
-  row.tdStatus.className = `status ${it.status || ""}`;
-  row.tdStatus.textContent = it.icon || "";
+  const si = statusInfo(it);
+  row.nameEl.textContent = it.name || "";
+  row.typeEl.textContent = (it.type || "").toUpperCase();
+  row.statusEl.className = `process-status ${si.cls}`;
+  row.statusEl.textContent = `${si.icon} ${si.label}`;
 
   const pidNum = Number(it.pid);
   const prevPid = Number(prev.pid);
   if (Number.isFinite(pidNum) && pidNum > 0) {
-    animateNumber(
-      row.pidSpan,
-      Number.isFinite(prevPid) && prevPid > 0 ? prevPid : pidNum,
-      pidNum,
-      (v) => `${Math.max(0, Math.round(v))}`
-    );
+    animateNumber(row.pidEl, Number.isFinite(prevPid) && prevPid > 0 ? prevPid : pidNum, pidNum, (v) => `${Math.max(0, Math.round(v))}`);
   } else {
-    row.pidSpan.textContent = "-";
+    row.pidEl.textContent = "-";
   }
-
-  row.tdStarted.textContent = it.started_at || "-";
-  row.tdUptime.textContent = it.uptime || "-";
+  row.startedEl.textContent = it.started_at || "-";
+  row.uptimeEl.textContent = it.uptime || "-";
+  row.targetEl.textContent = it.target || "";
 
   const cpuVal = parseFloat(it.cpu || "0") || 0;
   const gpuVal = parseFloat(it.gpu || "0") || 0;
   const memVal = parseFloat(it.mem_mb || "0") || 0;
   const netVal = parseFloat(it.net_kbs || "0") || 0;
   const ioVal = parseFloat(it.io_kbs || "0") || 0;
-
   const netKBVal = netIsMB ? netVal * 1024 : netVal;
   const netMBVal = netIsMB ? netVal : netVal / 1024;
   const ioKBVal = netIsMB ? ioVal * 1024 : ioVal;
@@ -561,56 +598,23 @@ const updateRow = (row, it, prev, netUnit, netIsMB) => {
   row.net.spark.innerHTML = buildSparkline(hist.net, "#c4b5fd");
   row.io.spark.innerHTML = buildSparkline(hist.io, "#f9d46b");
 
-  const netDisplay = netIsMB ? netVal.toFixed(2) : netVal.toFixed(0);
-  const ioDisplay = netIsMB ? ioVal.toFixed(2) : ioVal.toFixed(0);
+  animateNumber(row.cpu.val, toFiniteOr(parseFloat(prev.cpu || "0"), cpuVal), cpuVal, (v) => `${Math.max(0, Math.round(v))}%`);
+  animateNumber(row.gpu.val, toFiniteOr(parseFloat(prev.gpu || "0"), gpuVal), gpuVal, (v) => `${Math.max(0, Math.round(v))}%`);
+  animateNumber(row.mem.val, toFiniteOr(parseFloat(prev.mem_mb || "0"), memVal), memVal, (v) => `${Math.max(0, v).toFixed(2)}MB`);
+  animateNumber(row.net.val, toFiniteOr(parseFloat(prev.net_kbs || "0"), netVal), netVal, (v) => netIsMB ? `${Math.max(0, v).toFixed(2)}${netUnit}` : `${Math.max(0, Math.round(v))}${netUnit}`);
+  animateNumber(row.io.val, toFiniteOr(parseFloat(prev.io_kbs || "0"), ioVal), ioVal, (v) => netIsMB ? `${Math.max(0, v).toFixed(2)}${netUnit}` : `${Math.max(0, Math.round(v))}${netUnit}`);
 
-  const prevCpu = parseFloat(prev.cpu || "0");
-  const prevGpu = parseFloat(prev.gpu || "0");
-  const prevMem = parseFloat(prev.mem_mb || "0");
-  const prevNet = parseFloat(prev.net_kbs || "0");
-  const prevIo = parseFloat(prev.io_kbs || "0");
+  row.cpu.glow.style.opacity = `${Math.min(1, cpuVal / 100)}`;
+  row.gpu.glow.style.opacity = `${Math.min(1, gpuVal / 100)}`;
+  row.mem.glow.style.opacity = `${Math.min(1, memVal / 100)}`;
+  row.net.glow.style.opacity = `${Math.min(1, Math.abs(netVal) / 250)}`;
+  row.io.glow.style.opacity = `${Math.min(1, Math.abs(ioVal) / 250)}`;
 
-  animateNumber(
-    row.cpu.val,
-    toFiniteOr(prevCpu, cpuVal),
-    cpuVal,
-    (v) => `${Math.max(0, Math.round(v))}%`
-  );
-  animateNumber(
-    row.gpu.val,
-    toFiniteOr(prevGpu, gpuVal),
-    gpuVal,
-    (v) => `${Math.max(0, Math.round(v))}%`
-  );
-  animateNumber(
-    row.mem.val,
-    toFiniteOr(prevMem, memVal),
-    memVal,
-    (v) => `${Math.max(0, v).toFixed(2)}MB`
-  );
-  animateNumber(
-    row.net.val,
-    toFiniteOr(prevNet, netVal),
-    netVal,
-    (v) => netIsMB
-      ? `${Math.max(0, v).toFixed(2)}${netUnit}`
-      : `${Math.max(0, Math.round(v))}${netUnit}`
-  );
-  animateNumber(
-    row.io.val,
-    toFiniteOr(prevIo, ioVal),
-    ioVal,
-    (v) => netIsMB
-      ? `${Math.max(0, v).toFixed(2)}${netUnit}`
-      : `${Math.max(0, Math.round(v))}${netUnit}`
-  );
-
-  row.net.td.title = `NET: ${netKBVal.toFixed(1)} KB/s | ${netMBVal.toFixed(2)} MB/s`;
-  row.io.td.title = `IO: ${ioKBVal.toFixed(1)} KB/s | ${ioMBVal.toFixed(2)} MB/s`;
-  row.gpu.td.title = `GPU memory: ${it.gpu_mem_mb || 0} MB`;
-  row.mem.td.title = `RAM: ${memVal.toFixed(2)} MB`;
-
-  row.tdTarget.textContent = it.target || "";
+  row.cpu.spark.parentElement.title = `CPU: ${cpuVal.toFixed(1)}%`;
+  row.gpu.spark.parentElement.title = `GPU: ${gpuVal.toFixed(1)}%`;
+  row.mem.spark.parentElement.title = `RAM: ${memVal.toFixed(2)} MB`;
+  row.net.spark.parentElement.title = `NET: ${netKBVal.toFixed(1)} KB/s | ${netMBVal.toFixed(2)} MB/s`;
+  row.io.spark.parentElement.title = `IO: ${ioKBVal.toFixed(1)} KB/s | ${ioMBVal.toFixed(2)} MB/s`;
 };
 
 const render = (data) => {
@@ -630,8 +634,6 @@ const render = (data) => {
   collectErrorLog(data);
   const netUnit = (data.net_unit || "KB").toUpperCase();
   const netIsMB = netUnit === "MB";
-  const frag = document.createDocumentFragment();
-
   const prevMap = new Map();
   if (lastSnapshot && Array.isArray(lastSnapshot.items)) {
     for (const it of lastSnapshot.items) {
@@ -659,22 +661,23 @@ const render = (data) => {
     seen.add(name);
     let row = rowMap.get(name);
     if (!row) {
-      row = createRow(name);
+      row = createCard(name);
       rowMap.set(name, row);
     }
     const prev = prevMap.get(name) || {};
-    updateRow(row, it, prev, netUnit, netIsMB);
-    frag.appendChild(row.tr);
+    updateCard(row, it, prev, netUnit, netIsMB);
+    processCards.appendChild(row.card);
   }
 
   for (const [name, row] of rowMap.entries()) {
     if (!seen.has(name)) {
-      row.tr.remove();
+      row.card.remove();
       rowMap.delete(name);
     }
   }
-
-  tbody.replaceChildren(frag);
+  if (selectedProcessName) {
+    syncDrawer(selectedProcessName);
+  }
   lastSnapshot = data;
 };
 
@@ -696,22 +699,188 @@ const tick = async () => {
   }
 };
 
-tbody.addEventListener("click", async (e) => {
+processCards.addEventListener("click", async (e) => {
   const btn = e.target.closest("button");
-  if (!btn || !api) return;
-  const name = btn.dataset.name;
-  const action = btn.dataset.action;
-  try {
-    if (action === "open-folder") await api.OpenFolder(name);
-    if (action === "start") await api.Start(name);
-    if (action === "stop") await api.Stop(name);
-    if (action === "restart") await api.Restart(name);
-  } catch (err) {
-    console.error(err);
+  if (btn) {
+    if (!api) return;
+    const name = btn.dataset.name;
+    const action = btn.dataset.action;
+    try {
+      if (action === "open-folder") await api.OpenFolder(name);
+      if (action === "start") await api.Start(name);
+      if (action === "stop") await api.Stop(name);
+      if (action === "restart") await api.Restart(name);
+    } catch (err) {
+      console.error(err);
+    }
+    return;
   }
+  if (e.target.closest("input, select, textarea, label, a")) return;
+  const card = e.target.closest(".process-card[data-name]");
+  if (!card) return;
+  const name = card.dataset.name;
+  if (!name) return;
+  await openProcessEditor(name);
 });
 
-tbody.addEventListener("change", async (e) => {
+const openProcessEditor = async (name) => {
+  if (!api) return;
+  pendingProcessOpen = name;
+  if (!isConfigUnlocked()) {
+    openAuthModal();
+    return;
+  }
+  await refreshScreens();
+  const model = await api.GetConfigModel();
+  currentConfigModel = model;
+  openDrawer(name, model);
+};
+
+const focusProcessCard = (name) => {
+  activeProcessName = name || "";
+  for (const card of cfgProcesses.querySelectorAll(".process-card")) {
+    card.classList.toggle("selected", card.dataset.name === activeProcessName);
+  }
+  for (const card of cfgProcesses.querySelectorAll(".process-card")) {
+    if (card.dataset.name === activeProcessName) {
+      card.scrollIntoView({ behavior: "smooth", block: "start" });
+      break;
+    }
+  }
+};
+
+const findProcessModel = (name, model = currentConfigModel) => {
+  if (!model || !Array.isArray(model.processes)) return null;
+  return model.processes.find((p) => p.name === name) || null;
+};
+
+const drawerSetMetric = (el, value, title, colorClass) => {
+  if (!el) return;
+  el.textContent = value;
+  if (title) el.title = title;
+  if (colorClass) {
+    el.className = "";
+    el.classList.add(colorClass);
+  }
+};
+
+const renderDrawerSpark = (container, values, color) => {
+  if (!container) return;
+  container.innerHTML = buildSparkline(values.length ? values : [0], color);
+};
+
+const openDrawer = (name, model = currentConfigModel) => {
+  const p = findProcessModel(name, model);
+  if (!p) return;
+  selectedProcessName = name;
+  const si = statusInfo(lastSnapshot?.items?.find((it) => it.name === name) || p);
+  processDrawer.classList.remove("hidden");
+  processDrawer.setAttribute("aria-hidden", "false");
+  drawerTitle.textContent = p.name || name;
+  drawerStatusChip.textContent = `${si.icon} ${si.label}`;
+  drawerStatusChip.className = `drawer-chip ${si.cls}`;
+  drawerStatusText.textContent = p.type ? `${p.type.toUpperCase()} • ${p.path || p.process || ""}` : (p.path || p.process || "—");
+  drawerName.value = p.name || "";
+  drawerDisabled.checked = !!p.disabled;
+  drawerType.value = p.type || "exe";
+  drawerProcess.value = p.process || "";
+  drawerPath.value = p.path || "";
+  drawerCommand.value = p.command || "";
+  drawerArgs.value = p.args || "";
+  drawerScreen.value = String(Number(p.screen) || 0);
+  drawerCheckProcess.value = p.checkProcess || "";
+  drawerCheckCmdline.value = p.checkCmdline || "";
+  drawerCheckCmdlineExclude.value = p.checkCmdlineExclude || "";
+  drawerDelayStartTime.value = p.delayStartTime || "";
+  drawerMonitorHang.checked = !!p.monitorHang;
+  drawerHangTimeout.value = p.hangTimeout || "";
+  drawerPid.textContent = (lastSnapshot?.items?.find((it) => it.name === name)?.pid) || "—";
+  drawerStarted.textContent = lastSnapshot?.items?.find((it) => it.name === name)?.started_at || "—";
+  drawerUptime.textContent = lastSnapshot?.items?.find((it) => it.name === name)?.uptime || "—";
+  drawerTarget.textContent = lastSnapshot?.items?.find((it) => it.name === name)?.target || "—";
+  drawerCpu.textContent = lastSnapshot?.items?.find((it) => it.name === name)?.cpu ? `${lastSnapshot.items.find((it) => it.name === name).cpu}%` : "—";
+  drawerGpu.textContent = lastSnapshot?.items?.find((it) => it.name === name)?.gpu ? `${lastSnapshot.items.find((it) => it.name === name).gpu}%` : "—";
+  drawerMem.textContent = lastSnapshot?.items?.find((it) => it.name === name)?.mem_mb ? `${lastSnapshot.items.find((it) => it.name === name).mem_mb}MB` : "—";
+  drawerNet.textContent = lastSnapshot?.items?.find((it) => it.name === name)?.net_kbs ? `${lastSnapshot.items.find((it) => it.name === name).net_kbs}KB/s` : "—";
+  drawerIo.textContent = lastSnapshot?.items?.find((it) => it.name === name)?.io_kbs ? `${lastSnapshot.items.find((it) => it.name === name).io_kbs}KB/s` : "—";
+  const hist = metricHistory.get(name) || { cpu: [], gpu: [], mem: [], net: [], io: [] };
+  renderDrawerSpark(drawerCpuSpark, hist.cpu, "#67e8f9");
+  renderDrawerSpark(drawerGpuSpark, hist.gpu, "#fca5a5");
+  renderDrawerSpark(drawerMemSpark, hist.mem, "#a7f3d0");
+  renderDrawerSpark(drawerNetSpark, hist.net, "#c4b5fd");
+  renderDrawerSpark(drawerIoSpark, hist.io, "#f9d46b");
+  renderMonitorPicker(drawerScreenPicker, p.screen);
+  focusProcessCard(name);
+};
+
+const syncDrawer = (name) => {
+  const p = findProcessModel(name, currentConfigModel);
+  if (!p) return;
+  const it = lastSnapshot?.items?.find((x) => x.name === name) || p;
+  const si = statusInfo(it);
+  drawerStatusChip.textContent = `${si.icon} ${si.label}`;
+  drawerStatusChip.className = `drawer-chip ${si.cls}`;
+  drawerStatusText.textContent = p.type ? `${p.type.toUpperCase()} • ${p.path || p.process || ""}` : (p.path || p.process || "—");
+  drawerPid.textContent = it.pid || "—";
+  drawerStarted.textContent = it.started_at || "—";
+  drawerUptime.textContent = it.uptime || "—";
+  drawerTarget.textContent = it.target || "—";
+  drawerCpu.textContent = it.cpu ? `${it.cpu}%` : "—";
+  drawerGpu.textContent = it.gpu ? `${it.gpu}%` : "—";
+  drawerMem.textContent = it.mem_mb ? `${it.mem_mb}MB` : "—";
+  drawerNet.textContent = it.net_kbs ? `${it.net_kbs}KB/s` : "—";
+  drawerIo.textContent = it.io_kbs ? `${it.io_kbs}KB/s` : "—";
+}
+
+const closeDrawerPanel = () => {
+  processDrawer.classList.add("hidden");
+  processDrawer.setAttribute("aria-hidden", "true");
+  selectedProcessName = "";
+};
+
+const collectDrawerProcess = () => ({
+  name: drawerName.value.trim(),
+  disabled: drawerDisabled.checked,
+  type: drawerType.value,
+  process: drawerProcess.value,
+  path: drawerPath.value,
+  command: drawerCommand.value,
+  args: drawerArgs.value,
+  screen: Number(drawerScreen.value || 0),
+  checkProcess: drawerCheckProcess.value,
+  checkCmdline: drawerCheckCmdline.value,
+  checkCmdlineExclude: drawerCheckCmdlineExclude.value,
+  delayStartTime: drawerDelayStartTime.value,
+  monitorHang: drawerMonitorHang.checked,
+  hangTimeout: drawerHangTimeout.value,
+});
+
+const saveDrawerProcess = async () => {
+  if (!api || !currentConfigModel) return;
+  const updated = collectDrawerProcess();
+  if (!updated.name) throw new Error("Name is required");
+  const next = structuredClone(currentConfigModel);
+  next.processes = Array.isArray(next.processes) ? next.processes : [];
+  const idx = next.processes.findIndex((p) => p.name === selectedProcessName);
+  if (idx < 0) throw new Error("Process not found");
+  next.processes[idx] = updated;
+  await api.SaveConfigModel(next);
+  currentConfigModel = next;
+  selectedProcessName = updated.name;
+  await refreshScreens();
+  renderConfig(next);
+  openDrawer(updated.name, next);
+  await tick();
+};
+
+const isConfigUnlocked = () => unlocked || localStorage.getItem("goRunFilesUnlocked") === "1";
+
+const setConfigUnlocked = (value) => {
+  unlocked = !!value;
+  localStorage.setItem("goRunFilesUnlocked", unlocked ? "1" : "0");
+};
+
+processCards.addEventListener("change", async (e) => {
   const el = e.target;
   if (!el || !api) return;
   if (el.dataset.action !== "toggle-disabled") return;
@@ -738,6 +907,50 @@ tbody.addEventListener("change", async (e) => {
     alert(err.message || String(err));
   } finally {
     el.disabled = false;
+  }
+});
+
+closeDrawer.addEventListener("click", closeDrawerPanel);
+processDrawer.addEventListener("click", (e) => {
+  if (e.target.classList.contains("drawer-backdrop")) {
+    closeDrawerPanel();
+  }
+});
+
+[
+  [drawerOpenFolder, "folder", "Open folder"],
+  [drawerRestart, "restart", "Restart"],
+  [drawerStop, "stop", "Stop"],
+  [drawerStart, "start", "Start"],
+].forEach(([el, key, label]) => {
+  el.classList.add("neon-btn--icon");
+  el.innerHTML = ICONS[key] || "";
+  el.title = label;
+  el.setAttribute("aria-label", label);
+});
+
+drawerOpenFolder.addEventListener("click", async () => {
+  if (!api || !selectedProcessName) return;
+  await api.OpenFolder(selectedProcessName);
+});
+drawerRestart.addEventListener("click", async () => {
+  if (!api || !selectedProcessName) return;
+  await api.Restart(selectedProcessName);
+});
+drawerStop.addEventListener("click", async () => {
+  if (!api || !selectedProcessName) return;
+  await api.Stop(selectedProcessName);
+});
+drawerStart.addEventListener("click", async () => {
+  if (!api || !selectedProcessName) return;
+  await api.Start(selectedProcessName);
+});
+drawerSave.addEventListener("click", async () => {
+  if (!api) return;
+  try {
+    await saveDrawerProcess();
+  } catch (err) {
+    alert(err.message || String(err));
   }
 });
 
@@ -848,6 +1061,7 @@ const renderConfig = (model) => {
   }
 
   applyFilter();
+  if (activeProcessName) focusProcessCard(activeProcessName);
 };
 
 const buildProcessRow = (p = {}) => {
@@ -855,6 +1069,7 @@ const buildProcessRow = (p = {}) => {
   const initialExclude = p.checkCmdlineExclude || (initialType === "cmd" ? CMD_CHECK_CMDLINE_EXCLUDE_DEFAULT : "");
   const card = document.createElement("div");
   card.className = "process-card";
+  card.dataset.name = p.name || "";
   card.innerHTML = `
     <div class="process-grid">
       <label>Name
@@ -1002,7 +1217,11 @@ saveBtn.addEventListener("click", async () => {
 });
 
 toggleBtn.addEventListener("click", () => {
-  lockConfig();
+  if (isConfigUnlocked()) {
+    openConfigModal();
+    return;
+  }
+  pendingOpenConfig = true;
   openAuthModal();
 });
 
@@ -1032,17 +1251,18 @@ const runTick = async () => {
 
 window.onload = async () => {
   await tick();
-  if (api) {
-    if (unlocked) {
-      await refreshScreens();
-      const model = await api.GetConfigModel();
-      renderConfig(model);
-    }
+  unlocked = isConfigUnlocked();
+  if (api && unlocked) {
+    await refreshScreens();
+    const model = await api.GetConfigModel();
+    renderConfig(model);
   }
   await refreshSchedulerStatus();
-  lockConfig();
-  configPanel.classList.add("hidden");
-  document.querySelector(".config-actions").classList.add("hidden");
+  if (!unlocked) {
+    lockConfig();
+  } else {
+    closeAuthModal();
+  }
   scheduleTick(tickIntervalMs);
 };
 
@@ -1063,14 +1283,33 @@ cfgProcesses.addEventListener("click", (e) => {
 let unlocked = false;
 const PASSWORD = "art3d";
 
+const openConfigModal = async () => {
+  if (!isConfigUnlocked()) {
+    pendingOpenConfig = true;
+    openAuthModal();
+    return;
+  }
+  configModal.classList.remove("hidden");
+  configPanel.classList.remove("hidden");
+  document.querySelector(".config-actions").classList.remove("hidden");
+  document.querySelector(".config-grid").classList.remove("hidden");
+  document.querySelector(".process-list").classList.remove("hidden");
+  await refreshScreens();
+  const model = currentConfigModel || await api.GetConfigModel();
+  renderConfig(model);
+};
+
 const lockConfig = () => {
-  unlocked = false;
+  setConfigUnlocked(false);
+  pendingOpenConfig = false;
   document.querySelector(".config-grid").classList.add("hidden");
   document.querySelector(".process-list").classList.add("hidden");
   document.querySelector(".config-actions").classList.add("hidden");
   configPassword.value = "";
   configPanel.classList.add("hidden");
   configModal.classList.add("hidden");
+  closeDrawerPanel();
+  activeProcessName = "";
 };
 
 const unlockConfig = async () => {
@@ -1078,20 +1317,25 @@ const unlockConfig = async () => {
     alert("Неверный пароль");
     return;
   }
-  unlocked = true;
+  setConfigUnlocked(true);
   closeAuthModal();
-  document.querySelector(".config-grid").classList.remove("hidden");
-  document.querySelector(".process-list").classList.remove("hidden");
-  document.querySelector(".config-actions").classList.remove("hidden");
-  configPanel.classList.remove("hidden");
-  configModal.classList.remove("hidden");
-  await refreshScreens();
-  const model = await api.GetConfigModel();
-  renderConfig(model);
+  if (pendingOpenConfig) {
+    pendingOpenConfig = false;
+    await openConfigModal();
+  }
+  if (pendingProcessOpen) {
+    const model = currentConfigModel || await api.GetConfigModel();
+    currentConfigModel = model;
+    openDrawer(pendingProcessOpen, model);
+    pendingProcessOpen = "";
+  }
   await refreshSchedulerStatus();
 };
 
 unlockBtn.addEventListener("click", unlockConfig);
+
+lockConfigBtn.addEventListener("click", lockConfig);
+lockConfigModalBtn.addEventListener("click", lockConfig);
 
 const openAuthModal = () => {
   authModal.classList.remove("hidden");
@@ -1099,7 +1343,6 @@ const openAuthModal = () => {
 };
 
 const closeAuthModal = () => {
-  console.log('CLOSE');
   authModal.classList.add("hidden");
   configPassword.value = "";
 };

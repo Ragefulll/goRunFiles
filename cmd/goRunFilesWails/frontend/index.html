@@ -34,18 +34,11 @@
             <button class="panel-actions__button" id="toggleCheckProcess" title="Stop process checks" aria-label="Stop process checks">Stop Check Process</button>
             <button class="panel-actions__button" id="killNode" title="Kill all node.exe" aria-label="Kill all node.exe">Kill Node</button>
             <button class="panel-actions__button" id="toggleConsole" title="Консоль ошибок" aria-label="Консоль ошибок">📋</button>
+            <button class="panel-actions__button" id="lockConfigBtn" title="Lock config" aria-label="Lock config">Lock</button>
             <button class="panel-actions__button" id="toggleConfig" title="Настройки" aria-label="Настройки">⚙</button>
           </div>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>ACTIONS</th><th>NAME</th><th>TYPE</th><th>STATUS</th><th>PID</th>
-              <th>STARTED</th><th>UPTIME</th><th>CPU</th><th>GPU</th><th>RAM</th><th>NET</th><th>IO</th><th>TARGET</th>
-            </tr>
-          </thead>
-          <tbody id="tbody"></tbody>
-        </table>
+        <div id="processCards" class="process-cards"></div>
         <div id="errorConsoleContainer" class="error-console">
           <textarea id="errorConsole" readonly spellcheck="false" aria-label="Логи ошибок"></textarea>
         </div>
@@ -53,6 +46,66 @@
 
       <section class="panel hidden" id="configContainer"></section>
     </div>
+    <aside id="processDrawer" class="drawer hidden" aria-hidden="true">
+      <div class="drawer-backdrop"></div>
+      <div class="drawer-panel">
+        <div class="drawer-head">
+          <div>
+            <div class="drawer-kicker">Process detail</div>
+            <div id="drawerTitle" class="drawer-title">—</div>
+          </div>
+          <button id="closeDrawer" title="Close">✕</button>
+        </div>
+        <div class="drawer-status">
+          <span id="drawerStatusChip" class="drawer-chip">—</span>
+          <span id="drawerStatusText">—</span>
+        </div>
+        <div class="drawer-actions">
+          <button id="drawerOpenFolder" class="neon-btn neon-btn--folder">Folder</button>
+          <button id="drawerRestart" class="neon-btn neon-btn--restart">Restart</button>
+          <button id="drawerStop" class="neon-btn neon-btn--stop">Stop</button>
+          <button id="drawerStart" class="neon-btn neon-btn--start">Start</button>
+        </div>
+        <div class="drawer-stats">
+          <div><span>PID</span><strong id="drawerPid">—</strong></div>
+          <div><span>Started</span><strong id="drawerStarted">—</strong></div>
+          <div><span>Uptime</span><strong id="drawerUptime">—</strong></div>
+          <div class="full"><span>Target</span><strong id="drawerTarget">—</strong></div>
+        </div>
+        <div class="drawer-metrics">
+          <div class="drawer-metric"><span>CPU</span><strong id="drawerCpu">—</strong><div id="drawerCpuSpark" class="spark-wrap"></div></div>
+          <div class="drawer-metric"><span>GPU</span><strong id="drawerGpu">—</strong><div id="drawerGpuSpark" class="spark-wrap"></div></div>
+          <div class="drawer-metric"><span>RAM</span><strong id="drawerMem">—</strong><div id="drawerMemSpark" class="spark-wrap"></div></div>
+          <div class="drawer-metric"><span>NET</span><strong id="drawerNet">—</strong><div id="drawerNetSpark" class="spark-wrap"></div></div>
+          <div class="drawer-metric"><span>IO</span><strong id="drawerIo">—</strong><div id="drawerIoSpark" class="spark-wrap"></div></div>
+        </div>
+        <div class="drawer-form">
+          <label>Name <input id="drawerName" /></label>
+          <label>Disabled <input id="drawerDisabled" type="checkbox" /></label>
+          <label>Type
+            <select id="drawerType">
+              <option value="exe">exe</option>
+              <option value="cmd">cmd</option>
+              <option value="bat">bat</option>
+            </select>
+          </label>
+          <label>Process <input id="drawerProcess" /></label>
+          <label>Path <input id="drawerPath" /></label>
+          <label>Command <input id="drawerCommand" /></label>
+          <label>Args <input id="drawerArgs" /></label>
+          <label>Screen <input id="drawerScreen" type="hidden" /><div id="drawerScreenPicker" class="monitor-picker"></div></label>
+          <label>CheckProcess <input id="drawerCheckProcess" /></label>
+          <label>CheckCmdline <input id="drawerCheckCmdline" /></label>
+          <label>CheckCmdlineExclude <input id="drawerCheckCmdlineExclude" /></label>
+          <label>DelayStartTime <input id="drawerDelayStartTime" placeholder="30s" /></label>
+          <label>MonitorHang <input id="drawerMonitorHang" type="checkbox" /></label>
+          <label>HangTimeout <input id="drawerHangTimeout" /></label>
+        </div>
+        <div class="drawer-footer">
+          <button id="drawerSave" class="neon-btn neon-btn--restart">Save</button>
+        </div>
+      </div>
+    </aside>
     <div id="authModal" class="modal hidden">
       <div class="modal-backdrop"></div>
       <div class="modal-card">
@@ -80,6 +133,7 @@
         <div class="config-actions">
           <button class="panel-actions__button fixed" id="reloadConfig">Reload</button>
           <button class="panel-actions__button fixed" id="saveConfig">Save</button>
+          <button class="panel-actions__button fixed" id="lockConfigModalBtn">Lock</button>
           <button class="panel-actions__button fixed" id="addProcess">Add process</button>
           <button id="closeConfig" title="Закрыть">✕</button>
         </div>
