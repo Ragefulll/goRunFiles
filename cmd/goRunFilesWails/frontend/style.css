@@ -522,7 +522,7 @@ label input, .config-panel input[type="text"], .config-panel input[type="number"
   font-family: "Play", "GOST Type AU", "Roboto Mono", ui-monospace, "Cascadia Mono", "Consolas", "Courier New", monospace;
   font-size: 1.2rem;
 }
-.config-panel input[type="checkbox"] {
+/*.config-panel */input[type="checkbox"] {
   appearance: none;
   width: 3.4rem;
   height: 1.8rem;
@@ -532,7 +532,7 @@ label input, .config-panel input[type="text"], .config-panel input[type="number"
   position: relative;
   transition: background 160ms ease, border-color 160ms ease;
 }
-.config-panel input[type="checkbox"]::after {
+/*.config-panel */input[type="checkbox"]::after {
   content: "";
   position: absolute;
   top: 0.2rem;
@@ -543,15 +543,15 @@ label input, .config-panel input[type="text"], .config-panel input[type="number"
   background: #94a3b8;
   transition: transform 160ms ease, background 160ms ease;
 }
-.config-panel input[type="checkbox"]:checked {
+/*.config-panel */input[type="checkbox"]:checked {
   background: rgba(34, 197, 94, 0.25);
   border-color: var(--ok);
 }
-.config-panel input[type="checkbox"]:checked::after {
+/*.config-panel */input[type="checkbox"]:checked::after {
   transform: translateX(1.6rem);
   background: var(--ok);
 }
-.config-panel input[type="checkbox"].pulse {
+/*.config-panel */input[type="checkbox"].pulse {
   animation: pulse 420ms ease;
 }
 

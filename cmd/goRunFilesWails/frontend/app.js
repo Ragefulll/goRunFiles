@@ -915,6 +915,7 @@ processCards.addEventListener("change", async (e) => {
       }
     }
     await api.SaveConfigModel(model);
+    currentConfigModel = model;
     await tick();
   } catch (err) {
     console.error(err);
@@ -1082,16 +1083,24 @@ const renderConfig = (model) => {
 const buildProcessRow = (p = {}) => {
   const initialType = p.type || "exe";
   const initialExclude = p.checkCmdlineExclude || (initialType === "cmd" ? CMD_CHECK_CMDLINE_EXCLUDE_DEFAULT : "");
+  const disabledCmdCommand = initialType !== "cmd";
+  if (disabledCmdCommand) {
+    p.command = '';
+  }
   const card = document.createElement("div");
   card.className = "process-card";
   card.dataset.name = p.name || "";
   card.innerHTML = `
     <div class="process-grid">
+      <label>Disabled
+        <input data-f="disabled" type="checkbox" ${p.disabled ? "checked" : ""} />
+      </label>
       <label>Name
         <input data-f="name" value="${escapeAttr(p.name)}" />
       </label>
-      <label>Disabled
-        <input data-f="disabled" type="checkbox" ${p.disabled ? "checked" : ""} />
+      <label>Screen
+        <input data-f="screen" type="hidden" value="${Number(p.screen) || 0}" />
+        <div class="monitor-picker"></div>
       </label>
       <label>Type
         <select data-f="type">
@@ -1106,23 +1115,19 @@ const buildProcessRow = (p = {}) => {
       <label>Path
         <input data-f="path" value="${escapeAttr(p.path)}" />
       </label>
-      <label>Command
-        <input data-f="command" value="${escapeAttr(p.command)}" />
+      <label data-l="command" style="opacity: ${disabledCmdCommand ? '0.3' : '1'};">CMD Command (npm run start и тд)
+        <input data-f="command" disabled="${disabledCmdCommand}" value="${escapeAttr(p.command)}" />
       </label>
       <label>Args
         <input data-f="args" value="${escapeAttr(p.args)}" />
       </label>
-      <label>Screen
-        <input data-f="screen" type="hidden" value="${Number(p.screen) || 0}" />
-        <div class="monitor-picker"></div>
-      </label>
-      <label>CheckProcess
+      <label>CheckProcess (PROJECT.exe, PROJECT-Win64-Shipping.exe || node.exe)
         <input data-f="checkProcess" value="${escapeAttr(p.checkProcess)}" />
       </label>
-      <label>CheckCmdline
+      <label>CheckCmdline (name=PC2 || name=PC1 || ue-project.art3d.loc nuxt)
         <input data-f="checkCmdline" value="${escapeAttr(p.checkCmdline)}" />
       </label>
-      <label>CheckCmdlineExclude
+      <label>CheckCmdlineExclude (jetbrains,js-language-service,typingsinstaller,eslint)
         <input data-f="checkCmdlineExclude" value="${escapeAttr(initialExclude)}" />
       </label>
       <label>DelayStartTime
@@ -1146,9 +1151,16 @@ const buildProcessRow = (p = {}) => {
   typeSelect.value = initialType;
   typeSelect.addEventListener("change", () => {
     const excludeInput = card.querySelector('input[data-f="checkCmdlineExclude"]');
+    const labelCommand = card.querySelector('label[data-l="command"]');
+    const inputCommand = card.querySelector('input[data-f="command"]');
     if (!excludeInput) return;
     if (typeSelect.value === "cmd" && !(excludeInput.value || "").trim()) {
       excludeInput.value = CMD_CHECK_CMDLINE_EXCLUDE_DEFAULT;
+    }
+    labelCommand.style.opacity = typeSelect.value !== "cmd" ? 0.3 : 1;
+    inputCommand.disabled = typeSelect.value !== "cmd";
+    if (typeSelect.value !== "cmd") {
+      inputCommand.value = '';
     }
   });
   return card;
@@ -1224,8 +1236,8 @@ saveBtn.addEventListener("click", async () => {
   if (!unlocked) return;
   try {
     const model = collectConfig();
-
     await api.SaveConfigModel(model);
+    currentConfigModel = model;
   } catch (err) {
     alert(err.message || String(err));
   }
