@@ -70,9 +70,10 @@ func main() {
 	}
 
 	err = wails.Run(&options.App{
-		Title:  "ART3D Process Monitor",
-		Width:  2050,
-		Height: 900,
+		Title:            "ART3D Process Monitor",
+		Width:            2050,
+		Height:           900,
+		WindowStartState: options.Minimised,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
