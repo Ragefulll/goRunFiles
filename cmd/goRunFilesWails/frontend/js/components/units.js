@@ -54,9 +54,9 @@ const Sparkline = {
       const c = this.color;
       return {
         filter:
-          `drop-shadow(0 0 0.1rem ${withAlpha(c, 0.95)})` +
-          ` drop-shadow(0 0 0.3rem ${withAlpha(c, 0.6)})` +
-          ` drop-shadow(0 0 0.7rem ${withAlpha(c, 0.3)})`,
+          `drop-shadow(0 0 10rem ${withAlpha(c, 0.95)})` +
+          ` drop-shadow(0 0 10rem ${withAlpha(c, 0.6)})` +
+          ` drop-shadow(0 0 10rem ${withAlpha(c, 0.3)})`,
       };
     },
   },
@@ -64,9 +64,9 @@ const Sparkline = {
     <svg :viewBox="viewBox" width="100%" height="100%" preserveAspectRatio="none" class="spark">
       <defs>
         <linearGradient :id="gradId" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" :stop-color="color" stop-opacity="0.3" />
-          <stop offset="45%" :stop-color="color" stop-opacity="0.55" />
-          <stop offset="100%" :stop-color="color" stop-opacity="0.9" />
+          <stop offset="0%" :stop-color="color" stop-opacity="0.6" />
+          <stop offset="45%" :stop-color="color" stop-opacity="0.1" />
+          <stop offset="100%" :stop-color="color" stop-opacity="0" />
         </linearGradient>
       </defs>
       <polygon :points="area" :fill="fill" />

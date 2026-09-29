@@ -94,6 +94,14 @@ html.font-size-anim {
   src: url("fonts/play-bold.woff2") format("woff2");
 }
 @font-face {
+  font-family: "Segoe MDL2 Assets";
+  src: local("Segoe MDL2 Assets"), local("SegoeIcons");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
   font-family: "GOST Type AU";
   font-style: normal;
   font-weight: normal;
@@ -252,11 +260,14 @@ div#configPanel { position: relative; top: 2rem; }
   align-items: center;
   padding: 0.25rem 0.7rem;
   border-radius: 999px;
-  background: rgba(255,255,255,0.04);
+  /*background: rgba(255,255,255,0.04);*/
   border: 0.1rem solid rgba(255,255,255,0.08);
-  font-size: 1rem;
+  font-size: 1.2rem !important;
   /*letter-spacing: 0.08em;*/
   text-transform: uppercase;
+}
+.process-status {
+  box-shadow: -2rem 0 4rem rgba(0,0,0,0.4) !important;
 }
 .process-status.running { color: var(--ok); background: rgba(34,197,94,0.16); border-color: rgba(34,197,94,0.35); box-shadow: 0 0 1rem rgba(34,197,94,0.15); }
 .process-status.started { color: #fbbf24; background: rgba(245,158,11,0.16); border-color: rgba(245,158,11,0.35); box-shadow: 0 0 1rem rgba(245,158,11,0.15); }
@@ -388,7 +399,7 @@ div#configPanel { position: relative; top: 2rem; }
   z-index: 1;
   display: block;
   margin-top: 0.35rem;
-  font-size: 1.45rem;
+  font-size: 1.15rem;
   letter-spacing: -.09rem;
   font-weight: 100;
   font-variant-numeric: tabular-nums;
@@ -406,6 +417,21 @@ div#configPanel { position: relative; top: 2rem; }
   opacity: 0.92;
 }
 .anim-number { font-variant-numeric: tabular-nums; }
+
+.mdl2 {
+  font-family: "Segoe MDL2 Assets", "Segoe Fluent Icons", monospace;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: 0;
+  speak: none;
+}
+.status-ico {
+  display: inline-block;
+  font-size: .9em;
+  vertical-align: -0.1em;
+  margin-right: .4rem;
+}
 
 .row-disabled { opacity: 0.2; }
 .process-card.hung { border-color: rgba(239,68,68,0.5); }

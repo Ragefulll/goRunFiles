@@ -6,12 +6,12 @@ const toFiniteOr = (v, fallback) => {
 };
 
 const STATUS_META = {
-  running: { label: "Running", icon: "\u25b6", cls: "status-running" },
-  started: { label: "Starting", icon: "\u25d4", cls: "status-started" },
-  stopped: { label: "Stopped", icon: "\u25a0", cls: "status-stopped" },
-  disabled: { label: "Disabled", icon: "\u23f8", cls: "status-disabled" },
-  hung: { label: "Hung", icon: "\u26a0", cls: "status-hung" },
-  unknown: { label: "Unknown", icon: "?", cls: "status-unknown" },
+  running: { label: "Running", icon: "\ue768", cls: "status-running" },
+  started: { label: "Starting", icon: "\ue895", cls: "status-started" },
+  stopped: { label: "Stopped", icon: "\ue71a", cls: "status-stopped" },
+  disabled: { label: "Disabled", icon: "\ue769", cls: "status-disabled" },
+  hung: { label: "Hung", icon: "\ue7ba", cls: "status-hung" },
+  unknown: { label: "Unknown", icon: "\ue946", cls: "status-unknown" },
 };
 
 const statusInfo = (it) => {

@@ -82,7 +82,7 @@ const ProcessDrawer = {
           <button title="Close" @click="store.closeDrawer()">✕</button>
         </div>
         <div class="drawer-status">
-          <span class="drawer-chip" :class="status.cls">{{ status.icon }} {{ status.label }}</span>
+          <span class="drawer-chip" :class="status.cls"><i class="mdl2 status-ico">{{ status.icon }}</i> {{ status.label }}</span>
           <span>{{ statusText }}</span>
         </div>
         <div class="drawer-actions">
