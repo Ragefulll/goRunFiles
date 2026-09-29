@@ -50,7 +50,7 @@ const Sparkline = {
     fill() {
       return `url(#${this.gradId})`;
     },
-    glowStyle() {
+    lineStyle() {
       const c = this.color;
       return {
         filter:
@@ -61,12 +61,12 @@ const Sparkline = {
     },
   },
   template: `
-    <svg :viewBox="viewBox" width="100%" height="100%" preserveAspectRatio="none" class="spark" :style="glowStyle">
+    <svg :viewBox="viewBox" width="100%" height="100%" preserveAspectRatio="none" class="spark">
       <defs>
         <linearGradient :id="gradId" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" :stop-color="color" stop-opacity="0.65" />
-          <stop offset="45%" :stop-color="color" stop-opacity="0.26" />
-          <stop offset="100%" :stop-color="color" stop-opacity="0.08" />
+          <stop offset="0%" :stop-color="color" stop-opacity="0.3" />
+          <stop offset="45%" :stop-color="color" stop-opacity="0.55" />
+          <stop offset="100%" :stop-color="color" stop-opacity="0.9" />
         </linearGradient>
       </defs>
       <polygon :points="area" :fill="fill" />
@@ -78,6 +78,7 @@ const Sparkline = {
         stroke-linecap="round"
         stroke-linejoin="round"
         vector-effect="non-scaling-stroke"
+        :style="lineStyle"
       />
     </svg>
   `,

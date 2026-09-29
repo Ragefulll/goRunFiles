@@ -396,7 +396,7 @@ div#configPanel { position: relative; top: 2rem; }
 .spark-wrap {
   position: absolute;
   inset: 0.4rem 0.3rem 0.25rem;
-  opacity: 0.95;
+  opacity: 1;
 }
 .spark {
   width: 100%;
