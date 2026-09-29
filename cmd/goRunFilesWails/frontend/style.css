@@ -10,6 +10,8 @@
   --grid: #232a34;
   font-family: "Play", "GOST Type AU", "Roboto Mono", ui-monospace, "Cascadia Mono", "Consolas", "Courier New", monospace;
   font-synthesis: none;
+  letter-spacing: -.04rem;
+  font-weight: 100;
 }
 
 html {
@@ -136,15 +138,15 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 
 .block strong {
   display: block;
-  font-size: 22px;
+  font-size: 14px;
   margin-top: 4px;
 }
-.title { font-size: 2rem; font-weight: 600; letter-spacing: .05rem; }
+.title { font-size: 2rem; /*font-weight: 600;*/ /*letter-spacing: .05rem;*/ }
 .meta { color: var(--muted); }
 #version { color: var(--warn); }
 
 .panel { margin-top: 1.8rem; background: var(--panel); border: 0.1rem solid var(--grid); padding: 1.2rem; overflow: hidden; position: relative; }
-.panel h2 { margin: 0; font-size: 1.4rem; color: var(--muted); letter-spacing: .04rem; }
+.panel h2 { margin: 0; font-size: 1.4rem; color: var(--muted); /*letter-spacing: .04rem;*/ }
 .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
 #toggleConfig { font-size: 1.6rem; padding: 0.4rem 0.8rem; }
 #toggleConsole { font-size: 1.5rem; padding: 0.4rem 0.8rem; }
@@ -237,8 +239,7 @@ div#configPanel { position: relative; top: 2rem; }
 .process-card__identity { min-width: 0; }
 .process-name {
   font-size: 1.7rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-weight: 100;
 }
 .process-meta {
   display: flex;
@@ -254,7 +255,7 @@ div#configPanel { position: relative; top: 2rem; }
   background: rgba(255,255,255,0.04);
   border: 0.1rem solid rgba(255,255,255,0.08);
   font-size: 1rem;
-  letter-spacing: 0.08em;
+  /*letter-spacing: 0.08em;*/
   text-transform: uppercase;
 }
 .process-status.running { color: var(--ok); background: rgba(34,197,94,0.16); border-color: rgba(34,197,94,0.35); box-shadow: 0 0 1rem rgba(34,197,94,0.15); }
@@ -284,7 +285,7 @@ div#configPanel { position: relative; top: 2rem; }
   background: rgba(255,255,255,0.03);
   color: var(--text);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  /*letter-spacing: 0.08em;*/
   font-size: 1rem;
   transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
 }
@@ -333,7 +334,7 @@ div#configPanel { position: relative; top: 2rem; }
 
 .process-card__main {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.8rem;
   margin-top: 1rem;
 }
@@ -349,12 +350,12 @@ div#configPanel { position: relative; top: 2rem; }
   color: var(--muted);
   font-size: 0.95rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  /*letter-spacing: 0.08em;*/
 }
 .process-stat strong {
   display: block;
   margin-top: 0.35rem;
-  font-size: 1.2rem;
+  font-size: 1rem;
 }
 
 .process-metrics {
@@ -380,27 +381,29 @@ div#configPanel { position: relative; top: 2rem; }
   color: var(--muted);
   font-size: 0.95rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  /*letter-spacing: 0.08em;*/
 }
 .metric-chip .metric-val {
   position: relative;
   z-index: 1;
   display: block;
   margin-top: 0.35rem;
-  font-size: 1.15rem;
+  font-size: 1.45rem;
+  letter-spacing: -.09rem;
+  font-weight: 100;
   font-variant-numeric: tabular-nums;
 }
 .spark-wrap {
   position: absolute;
-  inset: 0.9rem 0.4rem 0.4rem 0.4rem;
+  inset: 0.4rem 0.3rem 0.25rem;
   opacity: 0.95;
 }
 .spark {
   width: 100%;
   height: 100%;
   display: block;
-  opacity: 0.88;
-  filter: drop-shadow(0 0 0.5rem rgba(255,255,255,0.12));
+  overflow: visible;
+  opacity: 0.92;
 }
 .anim-number { font-variant-numeric: tabular-nums; }
 
@@ -628,7 +631,7 @@ label input, .config-panel input[type="text"], .config-panel input[type="number"
 }
 .monitor-num {
   font-size: 2.4rem;
-  font-weight: 700;
+  /*font-weight: 700;*/
   color: #e2e8f0;
   line-height: 1;
 }
@@ -652,7 +655,7 @@ label input, .config-panel input[type="text"], .config-panel input[type="number"
   font-size: 0.75rem;
   color: #f59e0b;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  /*letter-spacing: 0.05em;*/
   margin-top: 0.2rem;
   background: rgba(245, 158, 11, 0.12);
   padding: 0 0.6rem;
@@ -691,7 +694,7 @@ label input, .config-panel input[type="text"], .config-panel input[type="number"
 }
 .monitor-pick-num {
   font-size: 1.2rem;
-  font-weight: 700;
+  /*font-weight: 700;*/
   color: #e2e8f0;
   line-height: 1;
 }
@@ -747,12 +750,12 @@ label input, .config-panel input[type="text"], .config-panel input[type="number"
 .drawer-kicker {
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  /*letter-spacing: 0.12em;*/
   font-size: 0.9rem;
 }
 .drawer-title {
   font-size: 2rem;
-  font-weight: 700;
+  /*font-weight: 700;*/
   margin-top: 0.2rem;
 }
 .drawer-status {
@@ -770,7 +773,7 @@ label input, .config-panel input[type="text"], .config-panel input[type="number"
   border: 0.1rem solid rgba(255,255,255,0.08);
   background: rgba(255,255,255,0.04);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  /*letter-spacing: 0.08em;*/
   font-size: 0.95rem;
 }
 .drawer-chip.status-running { color: var(--ok); }
@@ -801,7 +804,7 @@ label input, .config-panel input[type="text"], .config-panel input[type="number"
   display: block;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  /*letter-spacing: 0.08em;*/
   font-size: 0.9rem;
 }
 .drawer-stats strong {
@@ -903,7 +906,7 @@ tr[data-name] { cursor: pointer; }
   justify-content: space-between;
   align-items: center;
   margin-bottom: 0.8rem;
-  font-weight: 600;
+  /*font-weight: 600;*/
 }
 .modal-body label {
   display: flex;

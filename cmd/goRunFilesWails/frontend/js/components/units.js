@@ -2,6 +2,22 @@ import { clamp, toFiniteOr } from "../util.js";
 
 let seq = 0;
 
+const W = 90;
+const H = 26;
+
+const hexToRgb = (hex) => {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(hex).trim());
+  if (!m) return null;
+  const h = m[1].length === 3 ? m[1].split("").map((c) => c + c).join("") : m[1];
+  const n = parseInt(h, 16);
+  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+};
+
+const withAlpha = (hex, a) => {
+  const rgb = hexToRgb(hex);
+  return rgb ? `rgba(${rgb}, ${a})` : String(hex);
+};
+
 const Sparkline = {
   name: "Sparkline",
   props: {
@@ -13,39 +29,56 @@ const Sparkline = {
   },
   computed: {
     viewBox() {
-      return "0 0 90 26";
+      return `0 0 ${W} ${H}`;
     },
     points() {
-      const w = 90;
-      const h = 26;
       const v = this.values;
+      if (!v.length) return `0,${H} ${W},${H}`;
       const n = Math.max(v.length, 2);
-      const step = w / (n - 1);
+      const step = W / (n - 1);
       return v
         .map((x, i) => {
           const px = i * step;
-          const py = h - (clamp(toFiniteOr(x, 0), 0, 100) / 100) * h;
+          const py = H - (clamp(toFiniteOr(x, 0), 0, 100) / 100) * H;
           return `${px.toFixed(2)},${py.toFixed(2)}`;
         })
         .join(" ");
     },
     area() {
-      return `0,26 ${this.points} 90,26`;
+      return `0,${H} ${this.points} ${W},${H}`;
     },
     fill() {
       return `url(#${this.gradId})`;
     },
+    glowStyle() {
+      const c = this.color;
+      return {
+        filter:
+          `drop-shadow(0 0 0.1rem ${withAlpha(c, 0.95)})` +
+          ` drop-shadow(0 0 0.3rem ${withAlpha(c, 0.6)})` +
+          ` drop-shadow(0 0 0.7rem ${withAlpha(c, 0.3)})`,
+      };
+    },
   },
   template: `
-    <svg :viewBox="viewBox" width="90" height="26" class="spark">
+    <svg :viewBox="viewBox" width="100%" height="100%" preserveAspectRatio="none" class="spark" :style="glowStyle">
       <defs>
         <linearGradient :id="gradId" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" :stop-color="color" stop-opacity="0.55" />
-          <stop offset="100%" :stop-color="color" stop-opacity="0" />
+          <stop offset="0%" :stop-color="color" stop-opacity="0.65" />
+          <stop offset="45%" :stop-color="color" stop-opacity="0.26" />
+          <stop offset="100%" :stop-color="color" stop-opacity="0.08" />
         </linearGradient>
       </defs>
       <polygon :points="area" :fill="fill" />
-      <polyline :points="points" fill="none" :stroke="color" stroke-width="2" />
+      <polyline
+        :points="points"
+        fill="none"
+        :stroke="color"
+        stroke-width="1.2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        vector-effect="non-scaling-stroke"
+      />
     </svg>
   `,
 };
