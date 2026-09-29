@@ -153,9 +153,9 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   color: #93c5fd;
 }
 .panel-actions { display: flex; align-items: center; gap: 0.8rem; }
-.panel-actions__button { font-size: 1.2rem; padding: 0.6rem 1rem; border: 0.1rem solid var(--grid); background: #0b0f14; }
+.panel-actions__button { font-size: 1.2rem; padding: 0.6rem 1rem; border: 0.1rem solid var(--grid); background: #0b0f14; border-radius: 0.6rem; }
 div#configPanel { position: relative; top: 2rem; }
-.config-actions { margin-bottom: 0.8rem; display: flex; position: fixed; z-index: 1; }
+.config-actions { margin-bottom: 0.8rem; display: flex; position: fixed; z-index: 10; }
 .panel.hidden { display: none; }
 
 .process-cards {
@@ -518,6 +518,7 @@ label input, .config-panel input[type="text"], .config-panel input[type="number"
   background: #0b0f14;
   color: var(--text);
   border: 0.1rem solid var(--grid);
+  border-radius: .6rem;
   padding: 0.6rem 0.8rem;
   font-family: "Play", "GOST Type AU", "Roboto Mono", ui-monospace, "Cascadia Mono", "Consolas", "Courier New", monospace;
   font-size: 1.2rem;
@@ -888,7 +889,10 @@ tr[data-name] { cursor: pointer; }
   margin: 1vh auto 2vh auto;
   background: var(--panel);
   border: 0.1rem solid var(--grid);
-  padding: 1.2rem;
+  border-radius: 1.4rem;
+  padding: 1.2rem 1.2rem 3.2rem;
+  background: radial-gradient(circle at top left, rgb(59 142 246 / 12%), transparent 30%), linear-gradient(180deg, rgba(14, 17, 22, 0.95), rgba(17, 21, 29, 0.98));
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02) inset, 0 12px 35px rgba(0, 0, 0, 0.35);
 }
 .modal-card.modal-wide {
   width: 90vw;

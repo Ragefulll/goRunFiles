@@ -146,7 +146,7 @@ const ConfigProcessRow = {
         </label>
       </div>
       <div class="process-actions">
-        <button @click="$emit('remove')">Remove</button>
+        <button class="panel-actions__button" @click="$emit('remove')">Remove</button>
       </div>
     </div>
   `,

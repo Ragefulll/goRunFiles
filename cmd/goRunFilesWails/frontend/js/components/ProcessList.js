@@ -18,7 +18,7 @@ const AppHeader = {
         <strong>ART3D Process Monitor</strong>
         <span>&nbsp;</span>
       </div>
-      <div class="block meta"><span>Version:</span><strong>{{ store.version }}</strong></div>
+      <div class="block meta"><span>Version:</span><strong id="version">{{ store.version }}</strong></div>
       <div class="block meta"><span>Net:</span><strong :title="store.netStatusTitle">{{ store.netStatus }}</strong></div>
       <div class="block meta"><span>Net Debug:</span><strong>{{ store.netDebug }}</strong></div>
       <div class="block meta"><span>Updated:</span><strong>{{ store.updated }}</strong></div>

@@ -137,7 +137,7 @@ const ProcessCard = {
           <div class="process-name">{{ s.name || '' }}</div>
           <div class="process-meta">
             <span class="process-type">{{ (s.type || '').toUpperCase() }}</span>
-            <span class="process-status" :class="status.cls">{{ status.icon }} {{ status.label }}</span>
+            <span class="drawer-chip process-status" :class="status.cls">{{ status.icon }} {{ status.label }}</span>
           </div>
         </div>
         <div class="process-actions" @click.stop>
