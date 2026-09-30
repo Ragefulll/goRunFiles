@@ -400,6 +400,7 @@ div#configPanel { position: relative; top: 2rem; }
   display: block;
   margin-top: 0.35rem;
   font-size: 1.15rem;
+
   letter-spacing: -.09rem;
   font-weight: 100;
   font-variant-numeric: tabular-nums;

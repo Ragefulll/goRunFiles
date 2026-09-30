@@ -72,6 +72,9 @@ const ConfigProcessRow = {
     labelStyle() {
       return { opacity: this.isCmd ? "1" : "0.3" };
     },
+    labelStyleInvert() {
+      return { opacity: !this.isCmd ? "1" : "0.3" };
+    },
     rowClasses() {
       return {
         "hidden-by-filter": this.hidden,
@@ -114,8 +117,8 @@ const ConfigProcessRow = {
             <option value="bat">bat</option>
           </select>
         </label>
-        <label>Process
-          <input v-model="process.process" />
+        <label :style="labelStyleInvert">Process
+          <input v-model="process.process" :disabled="isCmd" />
         </label>
         <label>Path
           <input v-model="process.path" />
@@ -123,7 +126,7 @@ const ConfigProcessRow = {
         <label :style="labelStyle">CMD Command (npm run start и тд)
           <input v-model="process.command" :disabled="!isCmd" />
         </label>
-        <label>Args
+        <label>Args (-NoSmoothFrameRate t.IdleWhenNotForeground=0)
           <input v-model="process.args" />
         </label>
         <label>CheckProcess (PROJECT.exe, PROJECT-Win64-Shipping.exe || node.exe)
