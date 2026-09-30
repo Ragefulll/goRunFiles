@@ -97,6 +97,14 @@ const ConfigProcessRow = {
     onFocusName() {
       if (this.process.name) store.activeProcessName = this.process.name;
     },
+    canGenCheckProcess() {
+      return !!(this.process.process || "").trim();
+    },
+    genCheckProcess() {
+      const base = (this.process.process || "").trim().replace(/\.exe$/i, "").trim();
+      if (!base) return;
+      this.process.checkProcess = `${base}.exe, ${base}-Win64-Shipping.exe`;
+    },
   },
   template: `
     <div class="process-card" :class="rowClasses" :data-name="process.name">
@@ -130,7 +138,10 @@ const ConfigProcessRow = {
           <input v-model="process.args" />
         </label>
         <label>CheckProcess (PROJECT.exe, PROJECT-Win64-Shipping.exe || node.exe)
-          <input v-model="process.checkProcess" />
+          <div class="field-row">
+            <input v-model="process.checkProcess" />
+            <button type="button" class="panel-actions__button fixed" :disabled="!canGenCheckProcess" title="Сгенерировать из Process" @click="genCheckProcess">⚡</button>
+          </div>
         </label>
         <label>CheckCmdline (name=PC2 || name=PC1 || ue-project.art3d.loc nuxt)
           <input v-model="process.checkCmdline" />

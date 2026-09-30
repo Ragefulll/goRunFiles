@@ -898,6 +898,13 @@ label input, .config-panel input[type="text"], .config-panel input[type="number"
   gap: 0.6rem;
   color: var(--muted);
 }
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.field-row input { flex: 1; min-width: 0; }
+.field-row .panel-actions__button { flex: 0 0 auto; }
 tr[data-name] { cursor: pointer; }
 
 .modal.hidden { display: none; }
