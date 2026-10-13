@@ -48,6 +48,9 @@ wails dev -browser
 🖥️ **Для сборки exe с UI:**
 ```.\build.ps1 -Gui```
 
+> [!Note]
+> Чтобы снизить ложные срабатывания антивирусов, exe собирается с полными метаданными (версия, компания, описание) и манифестом. Для Авторити-подписи (рекомендуется) задайте `$env:CODESIGN_THUMBPRINT="<thumbprint>"` (сертификат из хранилища) или `$env:CODESIGN_PFX="путь\cert.pfx"` / `$env:CODESIGN_PFX_PASS="пароль"` — `build.ps1` подпишет exe через `signtool`.
+
 > [!Warning]
 > Для корректного `NET` (ETW на Windows) сборка должна быть с `CGO_ENABLED=1` и доступным `gcc` (MinGW-w64 в `PATH`).
 > Скрипты `run.ps1` и `build.ps1` теперь включают это автоматически и проверяют наличие `gcc`.

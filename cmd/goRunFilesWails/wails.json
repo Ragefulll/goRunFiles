@@ -8,5 +8,12 @@
   "frontend:dir": "frontend",
   "assetdir": "frontend",
   "icon": "build/appicon.png",
-  "wailsjsdir": "frontend"
+  "wailsjsdir": "frontend",
+  "info": {
+    "companyName": "ART3D",
+    "productName": "ART3D Process Monitor",
+    "productVersion": "3.0.3",
+    "copyright": "Copyright (C) 2026 ART3D",
+    "comments": "Windowed utility that monitors configured applications and restarts them if they exit unexpectedly."
+  }
 }
