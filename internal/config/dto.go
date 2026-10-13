@@ -32,6 +32,8 @@ type SettingsDTO struct {
 	AutoRestart           bool   `json:"autoRestart"`
 	AutoRestartTime       string `json:"autoRestartTime"`
 	AutoRestartOnExit     bool   `json:"autoRestartOnExit"`
+	Reboot                bool   `json:"reboot"`
+	RebootTime            string `json:"rebootTime"`
 	LaunchInNewConsole    bool   `json:"launchInNewConsole"`
 	AutoCloseErrorDialogs bool   `json:"autoCloseErrorDialogs"`
 	ErrorWindowTitles     string `json:"errorWindowTitles"`
@@ -63,6 +65,8 @@ func ToDTO(cfg Config) ConfigDTO {
 			AutoRestart:           cfg.Settings.AutoRestart,
 			AutoRestartTime:       cfg.Settings.AutoRestartTime,
 			AutoRestartOnExit:     cfg.Settings.AutoRestartOnExit,
+			Reboot:                cfg.Settings.Reboot,
+			RebootTime:            cfg.Settings.RebootTime,
 			LaunchInNewConsole:    cfg.Settings.LaunchInNewConsole,
 			AutoCloseErrorDialogs: cfg.Settings.AutoCloseErrorDialogs,
 			ErrorWindowTitles:     cfg.Settings.ErrorWindowTitles,
@@ -116,8 +120,15 @@ func FromDTO(dto ConfigDTO) (Config, error) {
 	cfg.Settings.AutoRestartTime = strings.TrimSpace(dto.Settings.AutoRestartTime)
 	cfg.Settings.AutoRestartOnExit = dto.Settings.AutoRestartOnExit
 	if cfg.Settings.AutoRestart {
-		if err := validateAutoRestartTime(cfg.Settings.AutoRestartTime); err != nil {
+		if err := validateClockTime(cfg.Settings.AutoRestartTime); err != nil {
 			return Config{}, fmt.Errorf("autoRestartTime: %w", err)
+		}
+	}
+	cfg.Settings.Reboot = dto.Settings.Reboot
+	cfg.Settings.RebootTime = strings.TrimSpace(dto.Settings.RebootTime)
+	if cfg.Settings.Reboot {
+		if err := validateClockTime(cfg.Settings.RebootTime); err != nil {
+			return Config{}, fmt.Errorf("rebootTime: %w", err)
 		}
 	}
 	cfg.Settings.LaunchInNewConsole = dto.Settings.LaunchInNewConsole
@@ -198,7 +209,7 @@ func parseFloatOrZero(s string) float64 {
 	return v
 }
 
-func validateAutoRestartTime(raw string) error {
+func validateClockTime(raw string) error {
 	s := strings.TrimSpace(raw)
 	if s == "" {
 		return fmt.Errorf("empty")

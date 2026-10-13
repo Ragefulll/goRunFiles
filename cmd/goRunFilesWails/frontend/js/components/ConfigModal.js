@@ -235,6 +235,12 @@ const ConfigModal = {
             <label>Restart on exit (scheduler)
               <input v-model="settings.autoRestartOnExit" type="checkbox" />
             </label>
+            <label>Reboot PC
+              <input v-model="settings.reboot" type="checkbox" />
+            </label>
+            <label>Reboot time
+              <input v-model="settings.rebootTime" type="time" step="60" placeholder="04:00" />
+            </label>
             <label>Use ETW network
               <input v-model="settings.useETWNetwork" type="checkbox" />
             </label>

@@ -35,17 +35,19 @@ type App struct {
 	firstStart      map[string]bool
 	hungSince       map[string]time.Time
 	manualStop      map[string]bool
-	autoRestart     autoRestartConfig
+	autoRestart     dailySchedule
+	rebootSchedule  dailySchedule
 	checkProcess    bool
 	onUpdateCb      func(DisplaySnapshot)
 	mu              sync.Mutex
 }
 
-type autoRestartConfig struct {
+type dailySchedule struct {
 	enabled  bool
 	clock    dayClock
 	lastDay  int
 	parseErr error
+	field    string
 }
 
 type dayClock struct {
@@ -94,7 +96,7 @@ func (a *App) Run(ctx context.Context) error {
 	defer showCursor()
 
 	now := time.Now()
-	a.maybeAutoRestart(now)
+	a.maybeScheduled(now)
 	statuses := a.computeStatuses(true, now)
 	a.render(statuses)
 
@@ -114,7 +116,7 @@ func (a *App) Run(ctx context.Context) error {
 				continue
 			}
 			now := time.Now()
-			a.maybeAutoRestart(now)
+			a.maybeScheduled(now)
 			statuses = a.computeStatuses(true, now)
 			a.render(statuses)
 		case <-restartTicker.C:
@@ -122,7 +124,7 @@ func (a *App) Run(ctx context.Context) error {
 				continue
 			}
 			now := time.Now()
-			a.maybeAutoRestart(now)
+			a.maybeScheduled(now)
 			a.computeStatuses(true, now)
 		}
 	}
@@ -158,7 +160,7 @@ func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot
 	a.onUpdateCb = onUpdate
 
 	now := time.Now()
-	a.maybeAutoRestart(now)
+	a.maybeScheduled(now)
 	statuses := a.computeStatuses(true, now)
 	a.notifySnapshot(statuses, now, a.IsCheckProcessRunning())
 
@@ -179,7 +181,7 @@ func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot
 				continue
 			}
 			now := time.Now()
-			a.maybeAutoRestart(now)
+			a.maybeScheduled(now)
 			statuses = a.computeStatuses(true, now)
 			a.notifySnapshot(statuses, now, true)
 		case <-restartTicker.C:
@@ -189,7 +191,7 @@ func (a *App) RunWithObserver(ctx context.Context, onUpdate func(DisplaySnapshot
 				continue
 			}
 			now := time.Now()
-			a.maybeAutoRestart(now)
+			a.maybeScheduled(now)
 			statuses = a.computeStatuses(true, now)
 			a.notifySnapshot(statuses, now, true)
 		}
@@ -1107,89 +1109,134 @@ func buildExeTarget(item *config.ProcessItem, namesToCheck []string) string {
 }
 
 func (a *App) applyAutoRestartSettings(cfg config.Config) {
-	a.autoRestart.enabled = cfg.Settings.AutoRestart
-	a.autoRestart.lastDay = 0
-	a.autoRestart.parseErr = nil
-	a.autoRestart.clock = dayClock{}
-	if !a.autoRestart.enabled {
+	applyDailySchedule(&a.autoRestart, cfg.Settings.AutoRestart, cfg.Settings.AutoRestartTime, "autoRestartTime")
+	applyDailySchedule(&a.rebootSchedule, cfg.Settings.Reboot, cfg.Settings.RebootTime, "rebootTime")
+}
+
+func applyDailySchedule(sched *dailySchedule, enabled bool, rawTime, field string) {
+	sched.enabled = enabled
+	sched.lastDay = 0
+	sched.parseErr = nil
+	sched.clock = dayClock{}
+	sched.field = field
+	if !enabled {
 		return
 	}
-	clock, err := parseDayClock(cfg.Settings.AutoRestartTime)
+	clock, err := parseDayClock(rawTime, field)
 	if err != nil {
-		a.autoRestart.parseErr = err
+		sched.parseErr = err
 		return
 	}
-	a.autoRestart.clock = clock
+	sched.clock = clock
+}
+
+// due reports whether the schedule should fire at now, updating its internal
+// state. It must be called with the App mutex held.
+func (s *dailySchedule) due(now time.Time) bool {
+	if !s.enabled {
+		return false
+	}
+	if s.parseErr != nil {
+		s.enabled = false
+		return false
+	}
+	today := dateKey(now)
+	if s.lastDay == today {
+		return false
+	}
+	target := time.Date(now.Year(), now.Month(), now.Day(), s.clock.hour, s.clock.min, s.clock.sec, 0, now.Location())
+	// Cold start: first check after launch. Must run BEFORE the
+	// now.Before(target) guard, otherwise lastDay stays 0 until the
+	// target time and then the cold-start skip fires instead of the trigger.
+	if s.lastDay == 0 {
+		if now.Before(target) {
+			// Started before target — permit today's trigger.
+			s.lastDay = -1
+		} else {
+			// Started after target — skip today.
+			s.lastDay = today
+		}
+		return false
+	}
+	if now.Before(target) {
+		return false
+	}
+	s.lastDay = today
+	return true
+}
+
+// maybeScheduled runs all time-based actions (process auto-restart, PC reboot).
+func (a *App) maybeScheduled(now time.Time) {
+	a.maybeAutoRestart(now)
+	a.maybeReboot(now)
 }
 
 func (a *App) maybeAutoRestart(now time.Time) {
 	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	if !a.autoRestart.enabled {
-		return
+	fire := a.autoRestart.due(now)
+	parseErr := a.autoRestart.parseErr
+	if parseErr != nil {
+		a.autoRestart.parseErr = nil
 	}
-	if a.autoRestart.parseErr != nil {
-		a.logger.Printf("%s autorestart disabled: %v", LogTag, a.autoRestart.parseErr)
-		a.autoRestart.enabled = false
-		return
-	}
-	today := dateKey(now)
-	if a.autoRestart.lastDay == today {
-		return
-	}
-	target := time.Date(now.Year(), now.Month(), now.Day(), a.autoRestart.clock.hour, a.autoRestart.clock.min, a.autoRestart.clock.sec, 0, now.Location())
-	// Cold start: first check after launch. Must run BEFORE the
-	// now.Before(target) guard, otherwise lastDay stays 0 until the
-	// target time and then the cold-start skip fires instead of the restart.
-	if a.autoRestart.lastDay == 0 {
-		if now.Before(target) {
-			// Started before target — permit today's trigger.
-			a.autoRestart.lastDay = -1
-		} else {
-			// Started after target — skip today.
-			a.autoRestart.lastDay = today
-		}
-		return
-	}
-	if now.Before(target) {
-		return
-	}
-	// Release lock during restart to avoid holding it across process operations.
 	a.mu.Unlock()
+
+	if parseErr != nil {
+		a.logger.Printf("%s autorestart disabled: %v", LogTag, parseErr)
+	}
+	if !fire {
+		return
+	}
 	if err := a.restartAllDelayed(now); err != nil {
 		a.logger.Printf("%s autorestart error: %v", LogTag, err)
 	}
-	a.mu.Lock()
-	a.autoRestart.lastDay = today
 }
 
-func parseDayClock(raw string) (dayClock, error) {
+func (a *App) maybeReboot(now time.Time) {
+	a.mu.Lock()
+	fire := a.rebootSchedule.due(now)
+	parseErr := a.rebootSchedule.parseErr
+	if parseErr != nil {
+		a.rebootSchedule.parseErr = nil
+	}
+	a.mu.Unlock()
+
+	if parseErr != nil {
+		a.logger.Printf("%s reboot disabled: %v", LogTag, parseErr)
+	}
+	if !fire {
+		return
+	}
+	if err := scheduleSystemReboot(); err != nil {
+		a.logger.Printf("%s reboot error: %v", LogTag, err)
+	}
+}
+
+func parseDayClock(raw, field string) (dayClock, error) {
 	s := strings.TrimSpace(raw)
 	if s == "" {
-		return dayClock{}, fmt.Errorf("autoRestartTime is empty")
+		return dayClock{}, fmt.Errorf("%s is empty", field)
 	}
 	parts := strings.Split(s, ":")
 	if len(parts) != 2 && len(parts) != 3 {
-		return dayClock{}, fmt.Errorf("autoRestartTime must be HH:MM or HH:MM:SS")
+		return dayClock{}, fmt.Errorf("%s must be HH:MM or HH:MM:SS", field)
 	}
 	h, err := strconv.Atoi(strings.TrimSpace(parts[0]))
 	if err != nil {
-		return dayClock{}, fmt.Errorf("autoRestartTime hour invalid")
+		return dayClock{}, fmt.Errorf("%s hour invalid", field)
 	}
 	m, err := strconv.Atoi(strings.TrimSpace(parts[1]))
 	if err != nil {
-		return dayClock{}, fmt.Errorf("autoRestartTime minute invalid")
+		return dayClock{}, fmt.Errorf("%s minute invalid", field)
 	}
 	sec := 0
 	if len(parts) == 3 {
 		sec, err = strconv.Atoi(strings.TrimSpace(parts[2]))
 		if err != nil {
-			return dayClock{}, fmt.Errorf("autoRestartTime second invalid")
+			return dayClock{}, fmt.Errorf("%s second invalid", field)
 		}
 	}
 	if h < 0 || h > 23 || m < 0 || m > 59 || sec < 0 || sec > 59 {
-		return dayClock{}, fmt.Errorf("autoRestartTime out of range")
+		return dayClock{}, fmt.Errorf("%s out of range", field)
 	}
 	return dayClock{hour: h, min: m, sec: sec}, nil
 }

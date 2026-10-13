@@ -44,6 +44,8 @@ type Settings struct {
 	AutoRestart           bool
 	AutoRestartTime       string
 	AutoRestartOnExit     bool
+	Reboot                bool
+	RebootTime            string
 	LaunchInNewConsole    bool
 	AutoCloseErrorDialogs bool
 	ErrorWindowTitles     string

@@ -101,6 +101,8 @@ export namespace config {
 	    autoRestart: boolean;
 	    autoRestartTime: string;
 	    autoRestartOnExit: boolean;
+	    reboot: boolean;
+	    rebootTime: string;
 	    launchInNewConsole: boolean;
 	    autoCloseErrorDialogs: boolean;
 	    errorWindowTitles: string;
@@ -119,8 +121,10 @@ export namespace config {
 	        this.restartTiming = source["restartTiming"];
 	        this.autoRestart = source["autoRestart"];
 	        this.autoRestartTime = source["autoRestartTime"];
-	        this.autoRestartOnExit = source["autoRestartOnExit"];
-	        this.launchInNewConsole = source["launchInNewConsole"];
+		this.autoRestartOnExit = source["autoRestartOnExit"];
+		this.reboot = source["reboot"];
+		this.rebootTime = source["rebootTime"];
+		this.launchInNewConsole = source["launchInNewConsole"];
 	        this.autoCloseErrorDialogs = source["autoCloseErrorDialogs"];
 	        this.errorWindowTitles = source["errorWindowTitles"];
 	        this.useETWNetwork = source["useETWNetwork"];

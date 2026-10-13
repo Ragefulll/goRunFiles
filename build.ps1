@@ -1,6 +1,7 @@
 param(
   [string]$Out = "goRunFiles.exe",
-  [switch]$Gui
+  [switch]$Gui,
+  [switch]$Current
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,6 +26,7 @@ function Enable-CgoIfWindows {
     $gccDirs = @(
       "C:\msys64\ucrt64\bin",
       "C:\msys64\mingw64\bin",
+      
       "C:\mingw64\bin",
       "C:\Program Files\mingw-w64\mingw64\bin"
     )
@@ -47,7 +49,11 @@ if (!(Test-Path $genScript)) {
   throw "scripts\\gen_version.ps1 not found"
 }
 
-$newVersion = & $genScript -Increment $true
+if ($Current) {
+    $newVersion = & $genScript -Increment $false
+} else {
+    $newVersion = & $genScript -Increment $true
+}
 
 Write-Host "Building version $newVersion"
 
